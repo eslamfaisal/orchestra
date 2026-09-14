@@ -174,7 +174,7 @@ Step numbers are stable IDs, not execution order. Explicit direct prerequisites 
 
 | Gate | What must be true | Where |
 |---|---|---|
-| 1. Provider feasibility | Claude Code + Codex approval, cancellation, usage signal, restart/adopt and exit-status behaviour proven on real CLIs; evidence matrix has no `unverified` MVP-required rows | M0-09 |
+| 1. Provider feasibility | Claude Code + Codex selected modes prove M0-09 mandatory launch, identity, permission, cancellation and exit operations; optional quota/reconnect limitations recorded, never assumed | M0-09 |
 | 2. Local MVP | fleet, worktrees, terminal + transcript views, prompts with verified/limited records answered from the web, Quick Delegate | M1-13 (`mvp-1`) |
 | 3. Reliable orchestration | deliverable-specific task results, dependency scheduling, independent-publisher review, validation evidence bound to a commit, controlled merges | M3-09 |
 | 4. Operational maturity | bounded recovery, history + checkpoints, conservative quota handling, desktop with single-owner upgrade protocol, mobile with stale-answer revalidation | M4–M7 |

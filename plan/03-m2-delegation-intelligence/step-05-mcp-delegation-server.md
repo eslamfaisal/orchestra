@@ -198,11 +198,14 @@ daemon restart mid-ask ─▶ lead_requests + agent_prompts rows survive; sweepe
    bridge reconnects; the Lead's re-call with the same requestId returns the stored state/answer — never a duplicate question
 ```
 
+### 4.7 Review reconciliation contract (2026-09-15)
+A Lead-capable client must have a verified base MCP negotiation/transport revision before any tool is offered. Unsupported optional elicitation/tasks extensions use the evidenced ordinary tool-return polling path; an unknown base protocol does not qualify. Persist requestId with session generation, canonical payload hash, expiry and actor; the same requestId with a changed payload returns conflict. Config cleanup removes only the owned session entry and preserves concurrent edits.
+
 ## 5. Tasks
 - [ ] Add `@modelcontextprotocol/sdk` (pinned, `minimumReleaseAge` respected) and record the spec revision the tools target in the module header; add `mcp.protocolRevision` + `mcp.features.{elicitation,tasks}` to each Lead-capable provider manifest (authored `unverified`) and assert the pair at `mcp.session_registered`.
 - [ ] `packages/core/src/delegation/`: `DelegationRequest` VO + state machine + policy rules (caps, depth, allowed task types) with unit tests.
 - [ ] `LeadTokenRegistry` (mint/verify/revoke, 0600 files, redaction) + revocation on `session.stopped|crashed`.
-- [ ] MCP config merge/restore in the launch path (`preLaunchFiles` extension per provider; backup file, restore on stop) for the required adapters (claude, codex) plus any enabled optional adapter.
+- [ ] MCP config merge/restore in the launch path (`preLaunchFiles` extension per provider; backup and owned-entry removal on stop, preserving concurrent edits) for the required adapters (claude, codex) plus any enabled optional adapter.
 - [ ] `orch mcp serve --session` stdio bridge (no tool logic) + `POST /mcp` streamable-HTTP endpoint behind `features.mcpHttp`.
 - [ ] Zod schemas for all five tools + snapshot test on tool names/descriptions/schemas.
 - [ ] `GetLeadCapabilities` use case (taxonomy × catalog × manifests × window health × policy).
@@ -252,7 +255,12 @@ daemon restart mid-ask ─▶ lead_requests + agent_prompts rows survive; sweepe
 | TC-M2-05-07 | Restart / resilience | 1. Have the Lead call `ask_user` 2. `kill -9` the daemon before answering 3. Restart the daemon 4. Answer the question | The question is still in Attention after restart with the same `requestId`; after answering, the Lead's re-call returns the answer; exactly one prompt and one delegation exist (`SELECT count(*) FROM lead_requests WHERE request_id = …` is 1) | ⬜ |
 | TC-M2-05-09 | Expiry is explicit, not silent | 1. Have the Lead call `ask_user` with `ttlMs` of 2 min 2. Do not answer 3. Wait past the TTL, then have the Lead re-call | Attention shows the item as *expired* with the reason; the re-call returns `state: 'expired', answer: null`; answering afterwards is refused with a clear message; no state is reported as answered | ⬜ |
 | TC-M2-05-10 | MCP revision pin | 1. Start a Lead on each Lead-capable provider 2. Check the `mcp.session_registered` event | The event carries the server revision, the manifest's `protocolRevision` and `revisionMatch`; an `unknown` match shows a Fleet warning and the Lead still works over the return-based path; `features.mcpElicitation`/`mcpTasks` remain off | ⬜ |
-| TC-M2-05-08 | Config hygiene | 1. Note the contents of the Lead provider's MCP config before the session 2. Stop the session 3. Compare | File restored byte-identical to the backup; token file removed; `~/.orchestra/mcp/` contains no orphan tokens | ⬜ |
+| TC-M2-05-08 | Config hygiene | 1. Note the contents of the Lead provider's MCP config before the session 2. Stop the session 3. Compare | Only the owned session entry removed; concurrent user edits preserved; token file removed; `~/.orchestra/mcp/` contains no orphan tokens | ⬜ |
+
+### 6.3 Review regression scenarios
+- [ ] Unknown base MCP revision disables Lead tools rather than silently proceeding.
+- [ ] Same requestId with changed question/options returns conflict.
+- [ ] Config edited during session is preserved on teardown.
 
 ## 7. Acceptance criteria (Definition of Done)
 - [ ] A real Claude Code Lead completes `capabilities → delegate → status → collect → ask_user` end-to-end on the scratch repo, with the delegated task running on a different vendor.

@@ -5,6 +5,8 @@
 
 This folder is the single source of truth for **how** Orchestra gets built, in what order, and how each piece is verified before the next one starts. It turns the product plan into an ordered, testable, trackable sequence of steps from an MVP to an enterprise-grade open-source platform.
 
+The [review response](REVIEW-RESPONSE-2026-09-15.md) records the feasibility corrections, deferred scope and remaining evidence gates. The [generated dependency graph](DEPENDENCIES.md) gives execution order; [KPI definitions](00-foundations/15-kpi-contract.md) give measurable release evidence.
+
 ## How this plan is organised
 
 ```
@@ -95,4 +97,4 @@ Stop when all tasks are done and tests pass; report which manual test cases (6.2
 Then you run the manual TCs yourself, record results in the step file and `PROGRESS.md`, and only then mark the step ✅. Keep the agent inside one step at a time; anything it discovers outside scope goes into the step's progress log, not into code.
 
 ## Verification of this plan
-`node plan/tools/verify-plan.mjs` (see `plan/tools/`) checks that every step listed in `ROADMAP.md` has a file, that each step file has the nine template sections, a status line, at least five manual test cases, and no leftover template placeholders.
+`node plan/tools/verify-plan.mjs` is read-only: it checks step files, template sections, unique manual test IDs, matching dependency/effort/status rows, milestone counts/totals, cycles, gated dependencies and the generated graph. Run `node plan/tools/verify-plan.mjs --write-graph` explicitly after changing dependencies. Run `node --test plan/tools/verify-plan.test.mjs` for its regression suite. These checks establish document consistency only; live provider and release evidence remain separate gates.

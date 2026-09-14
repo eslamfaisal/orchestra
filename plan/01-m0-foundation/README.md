@@ -9,7 +9,7 @@
 | Exit | daemon boots with SQLite, web shell loads and connects over WS, a `FakeProvider` session runs end-to-end through the API in CI, all quality gates green |
 
 ## Goal
-Stand up the skeleton every later milestone builds on: the monorepo and its guardrails, the pure domain package, the plugin SDK with a scripted `FakeProvider`, the NestJS daemon with config/logging/storage/auth/audit, the append-only event store, the HTTP + WS API, the web shell with the design system, and CI that enforces architecture, coverage, compliance rules and supply-chain hygiene. No real vendor CLI is touched in M0 — that is M1.
+Stand up the skeleton every later milestone builds on: the monorepo and its guardrails, the pure domain package, the plugin SDK with a scripted `FakeProvider`, the NestJS daemon with config/logging/storage/auth/audit, the append-only event store, the HTTP + WS API, the web shell with the design system, and CI that enforces architecture, coverage, compliance rules and supply-chain hygiene. M0-09 runs bounded human-led experiments on real Claude/Codex CLIs; M0-01…08 use fake providers only.
 
 ## Why this milestone now
 Everything in the product plan depends on three things being right from day one: the layer boundaries (D9), the plugin contract (D5) and the compliance controls being *code* (D4, C1–C13). Retrofitting `dependency-cruiser`, the ESLint bans or a `FakeProvider` after adapters exist is far more expensive than starting with them.
@@ -27,7 +27,7 @@ Everything in the product plan depends on three things being right from day one:
 - [ ] `packages/core` has 100 % branch coverage on state machines; overall ≥ 80 %.
 - [ ] Custom ESLint rules fail the build on a vendor-endpoint fetch and on PTY-regex parsing (proven by negative fixture tests).
 - [ ] OpenSSF Scorecard workflow running; `SECURITY.md`, `CONTRIBUTING.md` (DCO), `CODEOWNERS` in place.
-- [ ] All manual TCs in M0-01 … M0-08 recorded ✅ in the step files and `PROGRESS.md`.
+- [ ] M0-09 provider gate passes with real evidence; all manual TCs in M0-01 … M0-09 recorded ✅ in the step files and `PROGRESS.md`.
 
 ## Steps
 | ID | File | Title | Effort | Depends |

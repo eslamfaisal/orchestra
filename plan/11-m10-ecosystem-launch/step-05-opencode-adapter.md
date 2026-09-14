@@ -135,22 +135,22 @@ permission round-trip   (identical shape to every other provider — D14)
 Assess the official local server API for sessions, messages, events and permission responses first. Permit authenticated local control traffic to the verified provider process; this is distinct from calling upstream model endpoints. Restrict endpoint discovery to the owned local session and reject arbitrary remote URLs. One adapter does not imply identical capabilities across configured backends. Record provider/version/mode/backend identity, source retrieval date, fixtures, limitations and acceptance outcomes in foundation 14. Contract success never establishes live vendor compatibility.
 
 ## 5. Tasks
-- [ ] Verify the OpenCode surface against its docs and the installed CLI: hook names + payloads, headless/JSON flags, config file location and schema, list-models command (if any), permission/approval modes, MCP config path, `--version` output, 429 surfacing. Record findings in `README.md` and the step log **before** writing code.
+- [ ] Verify the OpenCode surface against its docs and the installed CLI: server event/permission schemas, supported execution modes, safe model-projection schema, list-models command (if any), permission/approval modes, MCP config path, `--version` output, 429 surfacing. Record findings in `README.md` and the step log **before** writing code.
 - [ ] Package scaffold + `orchestra.plugin.json` (`engines.orchestra`, `declares.egressHosts: []`, `declares.binaries: ["opencode"]`).
 - [ ] `BinaryRegistry` entry + version parser; `features.providers.opencode` flag (default off); Fleet "not installed" hint.
-- [ ] `ModelSource`: config reader (size-capped, tolerant, `Result`), documented list command, B1 secret filter, B2 precedence merge, B5 namespacing, `watch` with debounce.
+- [ ] `ModelSource`: verified credential-free provider projection or manually supplied metadata, documented list command, B1 boundary guard, B2 precedence merge, B5 namespacing, `watch` with debounce.
 - [ ] `opencode.backends` settings schema (Zod) with the credential-shaped-property refusal; Models screen inline editing writing back to the user layer.
 - [ ] Manifest schema change in `packages/sdk`: allow `models: []` **only** with the `dynamicModels` feature; extend `manifest.contract.spec` accordingly (this is the one SDK change this step is allowed to make).
 - [ ] `OpenCodeAuthProbe` (configured/not-configured, backend labels, no key reads) + no-secrets contract test.
 - [ ] `OpenCodeLauncher.interactive` / `.headless` typed argv builders + `preLaunchFiles` (hooks + MCP into the worktree, deep merge, backup).
-- [ ] `bin/orch-hook.mjs` + unit and stub-receiver integration tests.
-- [ ] `OpenCodeTelemetryParser` (Zod per hook kind, structured output lines, local log lines; unknown ⇒ `ParseError`).
+- [ ] Authenticated local server client + unit and stub-server integration tests.
+- [ ] `OpenCodeTelemetryParser` (Zod per server event kind and supported structured output; unknown ⇒ `ParseError`).
 - [ ] `OpenCodeRateLimitParser` (429 body/header shapes → `resetAt`/`retryAfterMs`, official vs estimate).
-- [ ] `OpenCodePaneController` (sendCommand + ack, switchModel across backends, answerPrompt + `keys.yaml` fallback).
-- [ ] Record fixtures against **two** backends (one hosted pay-as-you-go, one local `127.0.0.1`) with `orch fixtures record opencode`: hook payloads, a headless JSON run with a tool call and usage, an approval round-trip, a 429 sample, auth-missing and model-not-found exits, `keys.yaml`; redaction pass; `RECORDED.md` naming both backends and the CLI version.
+- [ ] `OpenCodePaneController` (sendCommand + ack, switchModel across backends, answerPrompt via documented permission response; unsupported operations manual-only).
+- [ ] Record fixtures against **two** backends (one hosted pay-as-you-go, one local `127.0.0.1`) with `orch fixtures record opencode`: hook payloads, a headless JSON run with a tool call and usage, an approval round-trip, a 429 sample, auth-missing and model-not-found exits, `manual-mode-limitations.md`; redaction pass; `RECORDED.md` naming both backends and the CLI version.
 - [ ] Catalog templates `packages/catalog/models/opencode/*.yaml` with `evidence: []` and a comment explaining that the user authors these.
 - [ ] Contract suite `defineAdapterContract(openCodeAdapter, fixtures/<cliVersion>)` + parser fuzz + the dynamic-models manifest spec.
-- [ ] Extend the M0-08 egress test with an `opencode` job: a full scripted session against a local stub backend ⇒ zero daemon egress.
+- [ ] Extend the M0-08 egress test with an `opencode` job: a full scripted session against a local stub backend ⇒ only authenticated local provider-control traffic, no upstream daemon calls.
 - [ ] README: supported backend shapes, how to add one, why no key ever reaches Orchestra, and the Goose alternative note.
 - [ ] Add `opencode` to `fixtures-matrix.yml` (fixtures only, C9); run the TC table; flip the feature flag default only after it is green.
 

@@ -14,8 +14,8 @@
 After this step every `WindowState` produced by M4-01 has a companion `QuotaForecast`: a burn rate (EWMA over `UsageSample`s, in units/hour), a time-to-limit, a projected exhaust timestamp, a projected utilisation at `resetAt`, and a threshold level (`unknown | ok | warn | high | critical`) derived from the 70 / 85 / 95 % marks. Forecasts are recomputed when a window changes and on a 60 s tick, persisted so they survive a restart, published as `quota.forecast_updated`, and readable at `GET /fleet/forecasts`. The assignment engine's `quotaAvailability(provider)` factor (`06-intelligence-layer.md` §3) stops being a stub and starts returning a number derived from the forecast. Every forecast field is labelled `confidence: 'estimate'` — a forecast is never *official*, even when the window it is built on is. No UI yet (M4-07).
 
 ## 2. Why
-- **G4 (never blocked)**: pre-emptive rerouting (M4-03) and reserves (M4-04) both need "when will this window run out", not just "how much is used".
-- **G2 (≥ 80 % of each paid window used productively)**: utilisation is only measurable against a projected end-of-window figure; M4-07 renders exactly these numbers.
+- **G4 (reduce avoidable interruptions)**: pre-emptive rerouting (M4-03) and reserves (M4-04) both need "when will this window run out", not just "how much is used".
+- **G2 (≥ 80 % of each paid window used productively)**: productive utilization uses observed attributable usage per foundation 15; projected utilization is a separate diagnostic.
 - **D3** (deterministic engine, not LLM guesses): the forecaster is a pure domain service with 100 % branch coverage and property tests, so routing behaviour under quota pressure is reproducible in golden tests.
 - **D7 / `06-intelligence-layer.md` §3**: `score = capabilityFit × quotaAvailability × costEfficiency × constraints`; this step supplies `quotaAvailability`.
 - **UX principle 4 "truth labelling"** and non-goal "exact remaining-quota readouts where vendors don't expose them": the forecast carries its own `confidence`, the `windowConfidence` it was derived from, `sampleCount` and `spanMinutes`, so the UI can say *estimate from 7 samples over 42 min*.
@@ -45,9 +45,9 @@ After this step every `WindowState` produced by M4-01 has a companion `QuotaFore
 Rules (100 % branch coverage in `quota-forecaster.spec.ts`):
 - **R-F1 Forecasts are never official.** `QuotaForecast.confidence` is the literal `'estimate'`. The window's own confidence travels as `windowConfidence` for display only. Asserted by a type-level test and a runtime test.
 - **R-F2 Evidence gate.** With fewer than `minSamples` (default 3) usage samples, or a sample span shorter than `minSpanMinutes` (default 10), the forecast is `{ level: 'unknown', burnRatePerHour: 0, timeToLimitMs: undefined, projectedExhaustAt: undefined }`. Never extrapolate from one sample.
-- **R-F3 Bucketed EWMA.** Samples are folded into fixed buckets of `bucketMinutes(kind)`; per-bucket rate = units in bucket ÷ bucket length; `ewma_b = α·rate_b + (1−α)·ewma_{b−1}` with `α = 1 − 2^(−bucketMinutes / halfLifeMinutes)`. Empty buckets contribute rate `0` (idle time lowers the burn rate — a fleet that stops working must not keep forecasting exhaustion).
+- **R-F3 Bucketed EWMA.** Samples are folded into fixed buckets of `bucketMinutes(kind)`; per-bucket rate = units in bucket ÷ bucket length; `ewma_b = α·rate_b + (1−α)·ewma_{b−1}` with `α = 1 − 2^(−bucketMinutes / halfLifeMinutes)`. Empty buckets contribute zero only when capture coverage proves inactivity; missing telemetry makes the forecast unknown.
 - **R-F4 Time-to-limit.** `timeToLimitMs = (limit − used) / burnRatePerMs` only when `limit` is known, `limit > used` and `burnRatePerHour > 0`; otherwise `undefined`. `used ≥ limit` ⇒ `timeToLimitMs = 0`, `level = 'critical'`.
-- **R-F5 Reset wins.** If `resetAt` is known and `now + timeToLimitMs ≥ resetAt`, the window resets before it is exhausted: `willResetFirst = true`, `projectedExhaustAt = undefined`, and the level is computed from `projectedUsedAtReset = used + burnRate × (resetAt − now)` clamped to `[used, ∞)`.
+- **R-F5 Reset wins.** If documented reset semantics establish a replenishment at `resetAt` and `now + timeToLimitMs ≥ resetAt`, the window resets before it is exhausted: `willResetFirst = true`, `projectedExhaustAt = undefined`, and the level is computed from `projectedUsedAtReset = used + burnRate × (resetAt − now)` clamped to `[used, ∞)`.
 - **R-F6 Thresholds + hysteresis.** Level from `pct = 100 × projectedUsedAtReset / limit` (or `100 × used / limit` when `resetAt` is unknown): `< 70 ok`, `≥ 70 warn`, `≥ 85 high`, `≥ 95 critical`. A level only falls again once `pct` drops `hysteresisPp` (default 5) below the threshold that raised it; the previous level is an input to `forecast()`, not hidden state.
 - **R-F7 No limit ⇒ no level.** If `limit` is unknown the level is `unknown` regardless of burn rate; `burnRatePerHour` and `spanMinutes` are still reported (they are useful on their own and feed M4-06 estimates).
 - **R-F8 Total function.** `forecast()` never throws and never returns `NaN`, `Infinity` or a negative number in any numeric field. Zero-length windows, `resetAt` in the past, duplicate timestamps, out-of-order samples and `limit = 0` are all handled (`limit = 0` ⇒ treated as unknown, R-F7).
@@ -190,6 +190,9 @@ quota.rate_limited (M4-01) ─────────────────�
         └─ changed? ─▶ emit quota.forecast_updated ─▶ /ws topic quota
                        crossed 95 for the first time ─▶ Attention item quota.threshold
 ```
+
+### 4.7 Measurement compatibility
+Forecast independently per provider/account/bucket/window instance and unit. Token consumption can estimate token-unit windows only, with overlap removed; percentage/credit/request windows need comparable official observation deltas and documented counting/reset semantics. Otherwise leave forecast values unknown while showing the latest official observation. Never project token rates onto credits or percentages. A limit bucket with no comparable sample stream is not zero burn.
 
 ## 5. Tasks
 - [ ] `packages/core/src/quota/forecast/`: `ForecastLevel`, `BurnRate`, `QuotaForecast`, `ForecastBasis`, `ForecastParams` types + Zod schemas mirrored in `packages/sdk`.

@@ -1,10 +1,14 @@
 # Milestone M8 — Customization & skills
 
-> Folder: `plan/09-m8-customization-skills/` · Steps: M8-01 … M8-08 · Effort: ~18 d · Status: ⬜
+| Field | Value |
+|---|---|
+| Steps | 8 (M8-01 … M8-08) |
+| Effort | 18 working days (sum of estimates) |
+| Status | ⬜ |
 
 ## Goal
 
-After M8 the intelligence layer is fully **data, not code** (D7): every knob that decides *what runs where* — routing policy, roles, task-type overrides, prompt templates, skills, playbooks, instruction files, auto-answer rules, notification and update channels — lives in versioned, layered files (`task > user > workspace > org > defaults`) that a person edits through validated editors with a live preview, and that the daemon hot-reloads without a restart. Skills become portable artifacts rendered into each provider's native location under a trust level, with evals that run fixture tasks across providers and write real `outcomes`. Those outcomes, plus the outcomes of every mission task since M3, feed a bounded, decaying, *local* learning loop that shows up as a Model Scorecard and as evidence in every "why this model" panel. A teammate can have their own defaults without touching anyone else's.
+After M8 the intelligence layer is fully **data, not code** (D7): every knob that decides *what runs where* — routing policy, roles, task-type overrides, prompt templates, skills, playbooks, instruction files, auto-answer rules, notification and update channels — lives in versioned, layered files (`task > user > workspace > org > defaults`) that a person edits through validated editors with a live preview, and that the daemon hot-reloads without a restart. Skills become portable artifacts rendered into each provider's native location under a trust level, with evals that run fixture tasks across providers and write real `outcomes`. Those outcomes, plus the outcomes of every mission task since M3, feed shadow proposals for a bounded, decaying local learning loop that shows up as a Model Scorecard and as evidence in every "why this model" panel. A teammate can have their own defaults without touching anyone else's.
 
 ## Why this milestone now
 
@@ -78,7 +82,7 @@ After M8 the intelligence layer is fully **data, not code** (D7): every knob tha
 |---|---|---|
 | Vendor skill / instruction file locations change (`.claude/skills`, `.agents/skills`, `AGENTS.md`) | installers write to the wrong place; agents ignore skills | locations come from `manifest.paths` only, verified at step start; Doctor drift case (M6-02) when a manifest range mismatches; fallback to instruction fragment |
 | Skill evals burn real quota | window exhaustion during a demo | preview + confirmation (C10), `skills.evals.maxCostTier`, cooling respected (C5), CI uses FakeProvider only (C9) |
-| Learning loop overfits on few samples | routing flips on noise | `minSamples` (5), ±0.2 hard cap in core, decay half-life, reset button, never touches constraints |
+| Learning loop overfits on few samples | routing flips on noise | shadow-only proposals by default; held-out evaluation and human-approved policy required; bounded deltas and rollback; never touches constraints |
 | Layer conflicts confuse users | "why did my model change?" | provenance on every key, `orch settings explain`, diff view, `!override` / `!append` explicit |
 | Instruction file composition leaks into diffs / commits | noisy PRs, secrets in repo | managed block reverted before result collection; local-file variant when the provider supports it; test IT-M8-08-03 |
 | Supply-chain: malicious skill content (2026 npm worms target `.claude/`) | agents execute hostile instructions | trust levels; checksum pinning; untrusted never installed; imported skills default untrusted |

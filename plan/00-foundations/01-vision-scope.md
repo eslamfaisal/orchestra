@@ -52,16 +52,7 @@ Developers pay for several AI coding subscriptions (Claude Code, Codex, Antigrav
 - A teammate has their own defaults and permissions; every spend/keys action is audited.
 
 ## Product KPIs (tracked from M4 onward in the Fleet screen)
-Each KPI has exactly one definition, one denominator and one documented treatment of missing data. **M10-08 owns the canonical query text**; this file owns the intent. The two G2 KPIs are deliberately *separate measurements* — routing a task off the top tier and using a paid window productively are different quantities and must never be summed or substituted for one another.
-
-| KPI | Numerator | Denominator | Missing data |
-|---|---|---|---|
-| **K1 off-top-tier share** (G2a) | routed tasks whose chosen model is not its provider's top tier | all tasks that reached `assigned` in the period, excluding `sandbox` missions | a task with no `routing_decision` row is excluded from both sides and counted in a separate *unrouted* line |
-| **K2 productive window utilisation** (G2b) | quota consumed by tasks that reached a terminal success state (`done`/`approved`) | quota observed as available in that window, **`official` observations only** | windows whose signal is `estimate` or `unknown` are excluded from the denominator and reported as *uncovered windows %*, never imputed |
-| Cross-review coverage % (G3) | mission tasks with a review round by an independent reviewer identity (ADR-022) | mission tasks whose TaskType requires review | tasks with `degraded_same_vendor` count as uncovered |
-| Avoidable-interruption rate (G4) | pauses where eligible capacity existed at pause time | all pauses | pauses with no capacity snapshot are counted as avoidable (conservative) |
-| Reroute success rate · time-to-detect drift · remediation time (G6) | per `doctor.*` evidence metrics | attempted reroutes / detected drifts | — |
-| Restore outcome mix (G5) | counts per recovery outcome, reported as a mix | restore attempts | never collapsed into a single "durable captured prompts with explicit recovery outcomes" number |
+Definitions, denominators, missing-data treatment, query contracts and observation windows are canonical in [15-kpi-contract.md](15-kpi-contract.md). M4-07 implements them and M10-08 archives real evidence. Routing share, total usage and productive usage are distinct measurements; none substitutes for another.
 
 ## Promises we deliberately do not make
 Orchestra orchestrates other vendors' CLIs. Anything it cannot observe or control, it does not promise. These are product requirements, not caveats bolted on later — every acceptance criterion in the plan must be phrased in the right-hand column.

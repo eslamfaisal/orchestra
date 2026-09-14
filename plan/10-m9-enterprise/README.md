@@ -1,10 +1,14 @@
 # Milestone 9 — Enterprise
 
-> Folder: `plan/10-m9-enterprise/` · Steps M9-01 … M9-09 · Effort ≈ 21 working days serial (ROADMAP lists ~22 d) · Status ⬜
+| Field | Value |
+|---|---|
+| Steps | 9 (M9-01 … M9-09) |
+| Effort | 21 working days (sum of estimates) |
+| Status | ⬜ |
 
 ## Goal
 
-After M9 a small team can run one `orchestrad` for everyone: users sign in through the organisation's identity provider, each user sees and controls only what their role allows, every mutating action lands in a hash-chained audit log that a security reviewer can verify and export to a SIEM, risky work (high-risk tasks, infra/migration/release task types, merges to protected branches) waits for a second pair of eyes, storage moves from the laptop's SQLite file to Postgres + S3 with a single config change, and the whole daemon ships as a non-root container with a Helm chart, health probes, Prometheus metrics and OTel traces. Missions can also start on a schedule or a git push instead of a click. Nothing built in M0–M8 is rewritten: single-user mode keeps working unchanged (implicit Admin, SQLite, local token), and every enterprise feature sits behind `auth.mode: team`, `storage.driver: postgres` and `features.*` flags (D8, D9).
+After M9 a trusted shared team can run one `orchestrad` under a shared OS/credential context (ADR-019; RBAC does not isolate execution): users sign in through the organisation's identity provider, each user sees and controls only what their role allows, every mutating action lands in a hash-chained audit log that a security reviewer can verify and export to a SIEM, risky work (high-risk tasks, infra/migration/release task types, merges to protected branches) waits for a second pair of eyes, storage moves from the laptop's SQLite file to Postgres + S3 through dialect-specific migrations, verified data transfer and repository contracts, and the whole daemon ships as a non-root container with a Helm chart, health probes, Prometheus metrics and OTel traces. Missions can also start on a schedule or a git push instead of a click. Nothing built in M0–M8 is rewritten: single-user mode keeps working unchanged (implicit Admin, SQLite, local token), and every enterprise feature sits behind `auth.mode: team`, `storage.driver: postgres` and `features.*` flags (D8, D9).
 
 ## Why this milestone now
 

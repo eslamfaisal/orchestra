@@ -30,7 +30,7 @@ M10 turns Orchestra from "a program you run" into "a platform other people can e
 ## Exit criteria — the 1.0 Definition of Done, itemised
 Each line is a row in the M10-08 audit table and must carry evidence (test ID, TC ID, screenshot path, or URL).
 
-- [ ] **DoD-1 Adapters.** Four adapters (claude, codex, agy, kimi) — plus opencode — pass the full seven-spec contract suite on pinned fixtures for their recorded CLI version, including an approval round-trip fixture and a rate-limit fixture that yields `resetAt` or `retryAfterMs`. Evidence: `CT-*` IDs per provider.
+- [ ] **DoD-1 Adapters.** Four required adapters (claude, codex, kimi, opencode; agy only if its separate gate is resolved) pass the full seven-spec contract suite on pinned fixtures for their recorded CLI version, including an approval round-trip fixture and a rate-limit fixture that yields `resetAt` or `retryAfterMs`. Evidence: `CT-*` IDs per provider.
 - [ ] **DoD-2 Worktrees + Review & Merge** run end to end on ≥ 2 providers on a real repository. Evidence: M3-09 acceptance record + PR URL.
 - [ ] **DoD-3 Cross-vendor review enforced** in e2e: a mission task's reviewer provider ≠ author provider, or the degrade path is flagged and audited. Evidence: M3-04 e2e ID.
 - [ ] **DoD-4 Interaction Bridge** answers permission / question / planApproval prompts from web **and** PWA on every shipped provider through that provider's declared `answerTransport`. Evidence: per-provider TC IDs + M7-03 push TC.

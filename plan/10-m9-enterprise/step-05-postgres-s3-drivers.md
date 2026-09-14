@@ -188,7 +188,7 @@ Repository contracts run on both clean databases and upgrades from the previous 
 | AT-M9-05-02 | application | `MigrateStorage` interrupted after table 5 and resumed | resume inserts no duplicates (conflict-do-nothing), final counts equal |
 | IT-M9-05-01 | integration | migration parity: full list on SQLite and Postgres (Testcontainers), normalised schema diff | only the documented deltas (jsonb, tsvector, trigger syntax) |
 | IT-M9-05-02 | integration | every repository contract spec against Postgres | identical behaviour to SQLite and in-memory |
-| IT-M9-05-03 | integration | `SearchPort` contract on both engines with the same corpus (identifiers, paths, Arabic text, `-term`, `"phrase"`, `prefix*`) | same hit sets and deep links; rank order equal for the top 10 |
+| IT-M9-05-03 | integration | `SearchPort` contract on both engines with the same corpus (identifiers, paths, Arabic text, `-term`, `"phrase"`, `prefix*`) | required relevant hits, filters and deep links match documented search contract; rank ordering may differ |
 | IT-M9-05-04 | integration | audit immutability on Postgres: `UPDATE`/`DELETE` as `orchestra_app` | both refused (privilege + trigger); `orch audit verify` still ok |
 | IT-M9-05-05 | integration | `S3RecordingStore` against MinIO: 120 MB recording multipart upload, `head` size check, presigned `Range` GET | bytes match, sha256 matches, ranged replay returns the right slice |
 | IT-M9-05-06 | integration | recordings upload with MinIO stopped for 60 s mid-run | segment stays staged, retries, uploads after recovery, no data loss, Attention item raised and cleared |

@@ -1,6 +1,10 @@
 # Milestone M6 — Self-maintenance
 
-> Folder: `plan/07-m6-self-maintenance/` · Steps M6-01 … M6-07 · ~16 working days · Depends on M1 (substrate, adapters, telemetry) and M4 (quota signals feed the drift classifier).
+| Field | Value |
+|---|---|
+| Steps | 7 (M6-01 … M6-07) |
+| Effort | 15.5 working days (sum of estimates) |
+| Status | ⬜ |
 
 ## Goal
 

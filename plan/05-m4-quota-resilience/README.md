@@ -1,14 +1,18 @@
 # Milestone 4 — Quota, budgets, resilience
 
-> Folder: `plan/05-m4-quota-resilience/` · Steps M4-01 … M4-07 · ~14 working days · Status ⬜
+| Field | Value |
+|---|---|
+| Steps | 7 (M4-01 … M4-07) |
+| Effort | 14 working days (sum of estimates) |
+| Status | ⬜ |
 
 ## Goal
 
-After M4 Orchestra knows, for every enabled provider, how much of each vendor quota window (5-h, weekly, daily, tokens) has been used, how fast it is burning, and when it will run out — using only official in-band signals — and it acts on that knowledge before the user is blocked: rate-limited providers cool until `resetAt`, affected tasks are rerouted at most once per window to the next capable provider, reserves protect the Lead and the review budget, an exhausted Lead hands its mission over to another provider's Lead through `PLAN.md`, and a mission can be dry-run against the current windows before a single token is spent. Every number the UI shows is labelled *official* or *estimate*.
+After M4 Orchestra reports available official observations or explicitly labelled estimates/unknown for how much of each vendor quota window (5-h, weekly, daily, tokens) has been used, how fast it is burning, and any supportable forecast — using only official in-band signals — and it acts on that knowledge before the user is blocked: rate-limited providers cool until `resetAt`, affected tasks are rerouted at most once per window to the next capable provider, reserves protect the Lead and the review budget, an exhausted Lead hands its mission over to another provider's Lead through `PLAN.md`, and a mission can be dry-run against the current windows before a single token is spent. Every number carries official/estimate/unknown provenance; admission budgets can overshoot.
 
 ## Why this milestone now
 
-- G4 ("never blocked") is the second-most-cited pain in `01-vision-scope.md`: one exhausted window stops everything. M1–M3 made the fleet run; M4 makes it keep running.
+- G4 (reduce avoidable interruptions) is the second-most-cited pain in `01-vision-scope.md`: one exhausted window stops everything. M1–M3 made the fleet run; M4 makes it keep running.
 - G2 KPIs (off-top-tier routing %, window utilisation %) cannot be measured without windows and forecasts; M4-07 is the first place they appear.
 - The assignment engine (M2-04) already multiplies by `quotaAvailability(provider)` (`06-intelligence-layer.md` §3) but has nothing real to multiply by until M4-02 exists.
 - M6 (drift classifier) and M8-06 (learning loop) consume quota signals; M4-01 is on their critical path (`ROADMAP.md` dependency graph).

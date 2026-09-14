@@ -11,7 +11,7 @@
 | Owner | |
 
 ## 1. Goal
-After this step **no mission task reaches merge without being reviewed by a different vendor's model**. When a task lands in `review_pending`, the daemon picks a reviewer with the `ReviewRule` domain service (`reviewer.provider ≠ author.provider`, two reviewers for `risk: high` and `security-audit`), launches a `code-review` task in a **read-only checkout of the author's branch**, and captures the reviewer's output as structured `ReviewFinding` rows (provider-native structured output where the CLI supports it, `REVIEW.md` otherwise). A verdict of `changes_requested` sends the findings back to the *author's* session as a follow-up message through `PaneController`, the author produces a new result, and a new round starts — up to `reviewRounds` from the playbook step, after which the task escalates to a human. Every round, reviewer choice and degradation is persisted and auditable.
+After this step **no mission task reaches merge without being reviewed by an independent publisher's model when required by policy**. When a task lands in `review_pending`, the daemon picks a reviewer with the `ReviewRule` domain service (`reviewer.modelPublisher ≠ author.modelPublisher` with both identities known, two reviewers for `risk: high` and `security-audit`), launches a `code-review` task in a **read-only checkout of the author's branch**, and captures the reviewer's output as structured `ReviewFinding` rows (provider-native structured output where the CLI supports it, `REVIEW.md` otherwise). A verdict of `changes_requested` sends the findings back to the *author's* session as a follow-up message through `PaneController`, the author produces a new result, and a new round starts — up to `reviewRounds` from the playbook step, after which the task escalates to a human. Every round, reviewer choice and degradation is persisted and auditable.
 
 ## 2. Why
 - G3 ("better output through diversity", cross-vendor review on 100 % of mission tasks) is *the* differentiating goal of the product; this step is where it becomes a machine-enforced constraint instead of a convention.
@@ -169,7 +169,7 @@ Record separate integrationId, modelPublisher, modelFamily, endpoint and billing
 | UT-M3-04-03 | unit | `requiredReviews` for `security-audit`, `risk: high` feature-impl, `changelog` | 2 / 2 / 0 with reasons |
 | UT-M3-04-04 | unit | `nextRound` at round < max, == max, rejected at round 1 | `rerun_author` / `escalate_human` / `escalate_human` |
 | UT-M3-04-05 | unit | `MarkdownFindingsExtractor` on `REVIEW.md` with a valid block, a missing block, a block with an unknown severity | ok / `FindingsUnparsable` / `FindingsUnparsable` naming the field |
-| AT-M3-04-01 | application | author `codex`, healthy `claude` + `agy` | reviewer provider ≠ `codex`; `routing_decisions` row persisted with reason `constraint:cross-vendor` |
+| AT-M3-04-01 | application | author OpenAI, healthy Anthropic reviewer plus a fixture-only alternate publisher | reviewer publisher differs from OpenAI; `routing_decisions` row persisted with reason `constraint:cross-vendor` |
 | AT-M3-04-02 | application | round loop: `changes_requested` twice with `maxRounds: 2` | two author re-runs, then `escalate_human`; `review_rounds_used = 2`; no third reviewer session started |
 | AT-M3-04-03 | application | two-reviewer task where reviewer A approves and B requests changes | merged verdict `changes_requested`; both reviews persisted with `mode` primary/secondary |
 | AT-M3-04-04 | application | `SubmitReviewFindings` replayed for the same review id | `Err(ReviewAlreadySubmitted)`, no duplicate findings |
@@ -177,7 +177,7 @@ Record separate integrationId, modelPublisher, modelFamily, endpoint and billing
 | CT-M3-04-01 | contract | `ReviewOutput` JSON schema validates every provider's recorded review fixture | all pass; schema version pinned with `fixturesVersion` |
 | IT-M3-04-01 | integration | read-only checkout lifecycle on the scratch repo | `.orchestra/reviews/<taskId>-r1` created at `headSha`, removed after the round; author branch untouched (`git log` identical) |
 | IT-M3-04-02 | integration | daemon restart mid-review round | round resumes or is restarted exactly once; no duplicate `reviews` row for `(task, round, mode)` |
-| E2E-M3-04-01 | e2e (Playwright) | FakeProvider author + FakeProvider reviewer with different `providerId`s | Board shows `round 1/2` then `approved`; findings visible via API |
+| E2E-M3-04-01 | e2e (Playwright) | FakeProvider author + FakeProvider reviewer with different known `modelPublisher` values | Board shows `round 1/2` then `approved`; findings visible via API |
 
 ### 6.2 Manual test cases (run by you before marking ✅)
 | ID | Scenario | Steps | Expected result | Status |

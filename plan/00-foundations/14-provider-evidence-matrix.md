@@ -1,13 +1,13 @@
 # 14 — Provider evidence matrix
 
 ## Purpose
-The plan's single weakness, found in review, is that it designs a universal provider contract **before proving which capabilities each provider actually exposes**. This file is the fix: one table where every claim about a vendor CLI is either backed by a recorded observation of that exact binary, or explicitly marked as not yet known.
+A central weakness found in review is that it designs a universal provider contract **before proving which capabilities each provider actually exposes**. This file is the fix: one table where every claim about a vendor CLI is either backed by a recorded observation of that exact binary, or explicitly marked as not yet known.
 
 It answers one question per row: *can Orchestra do this operation, with this provider, at this CLI version, in this execution mode — and what is the evidence?*
 
 Rules:
-- **Documentation is not evidence.** A vendor doc gets a row and the state `unverified`. Only running the real CLI and recording a fixture changes that.
-- **A green test suite is not evidence.** `FakeProvider` and recorded fixtures prove our parsing, not the vendor's behaviour. A passing contract run never promotes a state (`05-provider-contract.md` §5).
+- **Documentation is not runtime evidence.** A vendor doc gets a row and the state `unverified`. Only running the real CLI and recording a fixture changes that.
+- **A green mock test suite is not live-provider evidence.** `FakeProvider` and recorded fixtures prove our parsing, not the vendor's behaviour. A passing contract run never promotes a state (`05-provider-contract.md` §5).
 - **`unsupported` disables a feature, not a provider.** A provider with no headless permission path simply does not get headless auto-approval; it keeps every other capability it has.
 - **No MVP-required operation may ship `unverified`.** M0-09 is the gate.
 - This file is the human-readable source; `CapabilityManifest.capabilities[]` (`05-provider-contract.md` §2) is its machine-readable projection, and the two are kept in sync by `capability.contract.spec.ts`.
@@ -176,3 +176,6 @@ Documented path is the **local server API** (sessions, messages, events, permiss
 - **Each adapter step refreshes its own rows** at step start (M1-05 claude, M1-06 codex, M1-07 agy *if gated open*, M10-04 kimi, M10-05 opencode), re-reading the source URL and re-running the affected experiment.
 - A CLI version bump invalidates every row for that provider: the rows keep their old `cliVersion` for history and new rows are added; the Doctor (M6-02) opens a RepairCase for any operation with no row at the installed version.
 - The published copy of this table lives at `docs/providers/evidence-matrix.md` in the repo; this plan file is its specification.
+
+## Required versus optional operations
+M0-09 §4.2 defines the minimum required operations for the selected Claude/Codex mode. Required launch, structured identity, permission round-trip, cancellation outcome and durable process-exit observation must be verified (or limited without losing the mandatory behavior). `unsupported` or `manual-only` cannot satisfy a mandatory operation. Optional unsupported operations disable that feature; unknown quota and explicit manual recovery are allowed limitations. Split every grouped operation/mode row before recording an observation; `both` is not a valid evidence key. Add source retrieval date and tester identity to each completed record. No rows were promoted by this plan revision.

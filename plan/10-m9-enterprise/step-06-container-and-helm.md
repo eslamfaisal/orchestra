@@ -189,7 +189,7 @@ kubectl delete pod
       mark running sessions crashed(reason='host_restarted') → close pool → exit 0
   → new Pod (Recreate ⇒ old volume released first) → boot as above
       reconcile finds no tmux panes → sessions already crashed → open prompts re-derived (M5-05)
-      Fleet shows "restored" badge; Attention still holds every prompt that was open
+      Fleet shows "restored" badge; History retains captured prompts with accurate recovery outcomes
 ```
 
 ### 4.7 Review reconciliation contract (2026-09-15)
@@ -223,7 +223,7 @@ Pod replacement terminates its agent processes even when worktree data persists.
 | IT-M9-06-01 | integration | `docker build` then run the image with compose (Postgres+MinIO+Dex), start a FakeProvider session | session runs in tmux inside the container; recording uploads to MinIO; login via Dex works |
 | IT-M9-06-02 | integration | image content assertion | no vendor CLI binary present; runs as uid 10001; root filesystem read-only except `/data`, `/tmp` |
 | IT-M9-06-03 | integration | `helm lint` + `helm template` golden output + `kubeconform` for default, kind and single-mode values | schema-valid manifests; assertions fire for `replicaCount: 2`, missing `publicUrl`, disabled persistence |
-| IT-M9-06-04 | integration | kind: install chart, wait Ready ≤ 120 s, run a FakeProvider session, `kubectl delete pod`, wait Ready again | pod returns Ready; sessions marked `crashed(host_restarted)`; open prompts count before == after |
+| IT-M9-06-04 | integration | kind: install chart, wait Ready ≤ 120 s, run a FakeProvider session, `kubectl delete pod`, wait Ready again | pod returns Ready; sessions marked `crashed(host_restarted)`; captured prompt records retained with cancelled/session-gone or uncertain outcomes |
 | IT-M9-06-05 | integration | SIGTERM during an active recording upload and an unflushed audit spool | drain finishes both within the grace period; after restart `orch audit verify` ok and no staged segment is orphaned |
 | E2E-M9-06-01 | e2e | Playwright against the kind deployment through the ingress: log in via Dex, open Terminals, watch a FakeProvider pane, answer a prompt | WS through ingress works (xterm renders, prompt answered); no mixed-content or CSP errors |
 
@@ -233,7 +233,7 @@ Pod replacement terminates its agent processes even when worktree data persists.
 | TC-M9-06-01 | Build and inspect the image | 1. `docker build -t orchestra:dev -f deploy/docker/Dockerfile .`. 2. `docker run --rm orchestra:dev id` and `... sh -c 'command -v tmux git claude codex'`. 3. `docker image inspect` / `dive` for size and layers. | Runs as uid 10001; `tmux` and `git` present, no vendor CLI found; image ≤ 400 MB (record the actual size); OCI labels present. | ⬜ |
 | TC-M9-06-02 | Compose stack end to end | 1. `docker compose -f deploy/compose/team.yaml up -d` (daemon + Postgres + MinIO + Dex). 2. Log in as `alice`, start a FakeProvider session, answer a prompt, open the replay. | Everything works through the containerised daemon; the recording plays from MinIO via a presigned URL; `orch storage check` inside the container reports postgres + s3. | ⬜ |
 | TC-M9-06-03 | Helm install on kind | 1. `kind create cluster`. 2. `kind load docker-image orchestra:dev`. 3. `helm install orchestra deploy/helm/orchestra -f deploy/helm/values-kind.yaml`. 4. `kubectl wait --for=condition=Ready pod -l app=orchestra --timeout=120s`. 5. Port-forward and log in. | Pod Ready inside 120 s (record the actual time); readiness lists all six checks ok; the UI is reachable and OIDC login works. | ⬜ |
-| TC-M9-06-04 | Resilience: pod restart with work in flight | 1. Start two FakeProvider sessions; leave one prompt open and one recording mid-segment. 2. `kubectl delete pod -l app=orchestra`. 3. Watch `kubectl get pod -w` and the UI. | Pod terminates within the grace period (drain log shows spool flushed + upload finished); new pod Ready; both sessions show `crashed · host restarted` with the container-mode explanation; the open prompt is still in Attention with the restored badge; `orch audit verify` ok. | ⬜ |
+| TC-M9-06-04 | Resilience: pod restart with work in flight | 1. Start two FakeProvider sessions; leave one prompt open and one recording mid-segment. 2. `kubectl delete pod -l app=orchestra`. 3. Watch `kubectl get pod -w` and the UI. | Pod terminates within the grace period (drain log shows spool flushed + upload finished); new pod Ready; both sessions show `crashed · host restarted` with the container-mode explanation; the captured prompt is retained in History with session-gone outcome; it cannot be answered; `orch audit verify` ok. | ⬜ |
 | TC-M9-06-05 | Negative: misconfigured chart | 1. `helm install` with `replicaCount: 2`. 2. With `oidc.enabled: true` and empty `server.publicUrl`. 3. With `persistence.enabled: false` and `acceptDataLoss: false`. | Each install fails at template time with a specific, readable message; nothing is created in the cluster. | ⬜ |
 | TC-M9-06-06 | Negative: vendor CLI not mounted | 1. Install with `providers.binaries: {}`. 2. Open Fleet. 3. Try to start a Claude session. | Fleet shows Claude as "not mounted — see deployment docs" (not a crash); starting a session fails with `ProviderUnavailable` and a link to the docs; the daemon stays Ready. | ⬜ |
 | TC-M9-06-07 | Real CLI in the container | 1. Build a derived image with Claude Code installed per vendor docs. 2. Deploy it; `kubectl exec` and complete the official `claude` login once with the CLI config dir on `/data`. 3. Start a real session and answer a prompt from the browser. | Login persists across a pod restart (config on the PVC); the session runs in a tmux pane in the pod; prompts round-trip; nothing about the login was automated or proxied by Orchestra. | ⬜ |
@@ -249,7 +249,7 @@ Pod replacement terminates its agent processes even when worktree data persists.
 - [ ] One multi-arch image builds reproducibly, runs as a non-root user with a read-only root filesystem, and contains `tmux` + `git` but **no vendor CLI** (CI-asserted).
 - [ ] Image is signed (cosign) and ships an SBOM, consistent with the supply-chain controls in `07-compliance-rules.md`.
 - [ ] `helm install` on kind reaches `Ready` within 120 s against Postgres + MinIO + Dex, with startup/liveness/readiness probes behaving per the table (liveness does not depend on the DB).
-- [ ] `kubectl delete pod` → daemon returns Ready, sessions are marked `crashed(host_restarted)`, and the open-prompt count is unchanged (IT-M9-06-04, TC-M9-06-04).
+- [ ] `kubectl delete pod` → daemon returns Ready, sessions are marked `crashed(host_restarted)`, and captured prompt history is retained and process-bound approvals are cancelled (IT-M9-06-04, TC-M9-06-04).
 - [ ] Graceful drain flushes the audit spool and finishes recording uploads within the grace period, and every step is idempotent after a SIGKILL.
 - [ ] The chart refuses configurations that would silently lose data or break the single-instance invariant (TC-M9-06-05).
 - [ ] All three vendor-CLI mounting patterns are documented, and the licensing reason for not bundling is stated in the docs and the chart NOTES.

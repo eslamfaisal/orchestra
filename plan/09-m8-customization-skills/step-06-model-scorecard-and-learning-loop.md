@@ -123,6 +123,7 @@ export class ExportOutcomes {
 # settings section registered by this step (any layer)
 learning:
   enabled: true
+  mode: shadow          # v1 never auto-applies proposals
   minSamples: 5
   maxDelta: 0.2          # hard-capped in core; a larger value here is clamped and warned
   halfLifeDays: 30
@@ -133,16 +134,16 @@ telemetry:
 ```
 
 ### 4.3 Data / schema changes
-- `outcomes` gains the columns M8-05 introduced (`provider_id`, `skill_id`, `skill_version`, `eval_run_id`, `source`, `quality`, `created_at`); if M8-06 lands first, migration `m8_06_outcomes_ext` creates them and M8-05 reuses them. Additionally: `blocker_findings`, `major_findings`, `minor_findings`, `changed_loc INTEGER NOT NULL DEFAULT 0` (`review_findings` is kept as the legacy total for compatibility). Unique index `(task_id, source)` for idempotency.
+- `outcomes` gains the columns M8-05 introduced (`provider_id`, `skill_id`, `skill_version`, `eval_run_id`, `source`, `quality`, `created_at`); M8-05 is a required prerequisite; do not create an alternate migration order. Additionally: `blocker_findings`, `major_findings`, `minor_findings`, `changed_loc INTEGER NOT NULL DEFAULT 0` (`review_findings` is kept as the legacy total for compatibility). Unique index `(task_id, source)` for idempotency.
 - `model_profiles` (`04 §4`) already has `source(community/local)` and `evidence_json`. Migration `m8_06_local_profiles` adds `base_profile_id TEXT NULL`, `adjustments_json TEXT NULL`, `computed_at TEXT NULL`; unique index `(model_id, source)`.
-- New table `profile_adjustment_history`: `id, model_id, task_type, deltas_json, evidence_json, computed_at, reason, actor_json` — append-only, so the Scorecard can show "this weight moved on 2026-09-02 because of these 7 tasks".
-- New events: `learning.outcome_recorded {taskId, modelId, taskType, source}`, `learning.profiles_recomputed {changed, reason}`, `learning.adjustments_reset {scope, removed, actor}`, `learning.export_created {rows, path, schemaVersion}`. `audit_log` rows for reset and export (both are user-visible, consequential actions).
+- New table `profile_adjustment_history`: `id, model_id, task_type, deltas_json, evidence_json, computed_at, reason, actor_json` — append-only, so the Scorecard can show "this proposal was computed from these 7 tasks; application requires separate approval".
+- New events: `learning.outcome_recorded {taskId, modelId, taskType, source}`, `learning.proposals_recomputed {changed, reason}`, `learning.adjustments_reset {scope, removed, actor}`, `learning.export_created {rows, path, schemaVersion}`. `audit_log` rows for reset and export (both are user-visible, consequential actions).
 - No change to `routing_decisions` beyond the new `local-evidence` reason code in the existing closed union (a typed change, per M2-04).
 
 ### 4.4 Infrastructure (tmux, git, fs, network, external processes)
 - `OutcomeRepository` and `LocalProfileRepository` in `apps/daemon/src/infrastructure/learning/`.
 - Recompute trigger: debounced (30 s) after any `RecordOutcome`, plus on `learning.*` settings change, plus on demand. Recompute is a single pass over the aggregation window per affected model — indexed by `(model_id, task_type, created_at)`, so it stays a millisecond-scale query even at tens of thousands of rows.
-- The recomputed local profile is published through the existing `ModelCatalogPort` hot-reload path (M2-02), so the assignment engine picks it up with no code change and `catalogVersion` on the next decision changes.
+- Recomputed profiles are stored as shadow proposals only. Publishing through ModelCatalogPort requires a separately recorded evaluation and human-approved policy version; ordinary recompute never changes routing.
 - Export: writes `outcomes-<hostHash>-<from>-<to>.jsonl` + `manifest.json` into a user-chosen directory. **Anonymisation is structural**: the exporter builds each row from an explicit allowlist of fields (`modelId`, `providerId`, `taskType`, metrics, bucketed `changedLoc`, `source`, coarse `createdAt` to the day) — there is no "strip the bad fields" pass that a new column could sneak past. `taskId`, `skillId` (unless the skill is a shipped pack id), repo paths, goals, branch names and host id are never present; `hostHash` is a salted, rotating hash stored locally only.
 - Export requires `telemetry.anonymisedExport: true` **and** an interactive confirmation showing a sample of the exact rows to be written (C10, data handling).
 - No network in this step. The `no-vendor-endpoints` ESLint rule and the M0-08 egress test cover the module; uploading is M10-02's problem.
@@ -155,7 +156,7 @@ telemetry:
 - `POST /api/models/adjustments/reset` — body `{ scope }` → audited reset.
 - `GET /api/outcomes?modelId=&taskType=&source=&from=&to=&cursor=` → paged rows (the evidence behind a cell).
 - `POST /api/outcomes/export` — body `{ anonymised: true, outPath, from?, to?, preview? }`; `preview: true` returns the sample without writing.
-- WS topic `learning`: `learning.profiles_recomputed` so the Scorecard and the routing preview refresh.
+- WS topic `learning`: `learning.proposals_recomputed` so the Scorecard refreshes its shadow proposal; active routing remains unchanged.
 - CLI: `orch models scorecard [--task-type] [--json]`, `orch models reset-adjustments [--model] [--task-type]`, `orch outcomes list`, `orch outcomes show <taskId>`, `orch outcomes export --anonymised --out <dir> [--preview]`.
 - UI `apps/web/src/features/models/scorecard/` (the Scorecard promised in `12-ux-principles.md` for Models):
   - `ScorecardGrid` — rows = models, columns = task types (or transposed); each cell shows the headline metric, `n=<sampleSize>`, a confidence chip (`n<minSamples` reads *insufficient evidence* in words, not a faded colour), and an adjustment marker when a delta is active.
@@ -176,7 +177,7 @@ task finishes (M3-03 result / M3-04 review verdict / M8-05 eval score)
               ├─ OutcomeAggregator.aggregate  ─▶ Evidence[] (weighted, decayed, sampleSize unweighted)
               ├─ LocalProfileAdjuster.adjust  ─▶ ProfileAdjustment[]  (|delta| ≤ 0.2, minSamples gate)
               ├─ model_profiles(source='local').upsert + profile_adjustment_history append
-              └─ ModelCatalogPort hot reload ─▶ learning.profiles_recomputed ─▶ WS 'learning'
+              └─ ModelCatalogPort hot reload ─▶ learning.proposals_recomputed ─▶ WS 'learning'
 
 next routing decision ─▶ AssignmentEngine reads the adjusted dimensions (no engine change)
    ─▶ if an approved policy version changed the ranking, reasons include `local-evidence`
@@ -195,9 +196,9 @@ Default learning mode is shadow: compute proposals and scorecards while routing 
 - [ ] `OutcomeAggregator` — decay weighting, unweighted sample size, per-source breakdown, eligibility flags; 100 % branch coverage.
 - [ ] `LocalProfileAdjuster` — cohort-median mapping, fixed gain, hard ±`maxDelta` clamp in one place, `minSamples` gate, per-delta explanation strings; property test for the cap.
 - [ ] `RecordOutcome` use case with `(task_id, source)` idempotency; wire the three callers (M3-03, M3-04, M8-05) without changing their public shapes.
-- [ ] `RecomputeLocalProfiles` with debounce and settings-change trigger; publish through `ModelCatalogPort` hot reload.
+- [ ] `RecomputeLocalProfiles` with debounce and settings-change trigger; persist shadow proposals; publish through ModelCatalogPort only after separate evaluation and human-approved policy.
 - [ ] `ResetLocalAdjustments` (three scopes) + audit; `profile_adjustment_history` append on every recompute that changes a delta.
-- [ ] Migrations `m8_06_outcomes_ext` (coordinate with M8-05's `m8_05_outcomes_ext` — whichever lands first owns the shared columns), `m8_06_local_profiles`, `m8_06_adjustment_history` + repositories and indexes.
+- [ ] Migrations `m8_06_outcomes_ext` (coordinate with M8-05's `m8_05_outcomes_ext` — M8-05 is the prerequisite and owns shared columns), `m8_06_local_profiles`, `m8_06_adjustment_history` + repositories and indexes.
 - [ ] Add `local-evidence` to the `ReasonCode` union and emit it from the engine when an adjustment changed the chosen candidate; update the reason-label table.
 - [ ] `ExportOutcomes` with structural field allowlist, bundle manifest (`schemaVersion`, range, row count, salted `hostHash`), preview mode, settings gate, audit.
 - [ ] Event schemas `learning.*`; WS topic `learning`.
@@ -221,8 +222,8 @@ Default learning mode is shadow: compute proposals and scorecards while routing 
 | AT-M8-06-01 | application | `RecordOutcome` replayed for the same `(taskId, source)` | one row; no duplicate recompute; no history entry |
 | AT-M8-06-02 | application | `ExportOutcomes` with `telemetry.anonymisedExport: false` | refused with a typed error; nothing written |
 | AT-M8-06-03 | application | export bundle field audit | every emitted key is on the allowlist; a deliberately added `goal` column on `outcomes` does **not** appear in the bundle |
-| IT-M8-06-01 | integration | complete 6 FakeProvider tasks of one task type | outcomes written; recompute runs once (debounced); a local profile row exists; `learning.profiles_recomputed` emitted |
-| IT-M8-06-02 | integration | routing before vs after the adjustment | the decision changes and its reasons include `local-evidence`; `catalogVersion` on the decision differs from before |
+| IT-M8-06-01 | integration | complete 6 FakeProvider tasks of one task type | outcomes written; recompute runs once (debounced); a local profile row exists; `learning.proposals_recomputed` emitted |
+| IT-M8-06-02 | integration | routing before vs after the adjustment | shadow recompute leaves the decision/catalogVersion unchanged; after separately approved publication, local-evidence records the policy and proposal version |
 | IT-M8-06-03 | integration | reset adjustments | local rows removed, audit row written, next decision matches the pre-learning golden result exactly (M2-04 suite still passes) |
 | E2E-M8-06-01 | e2e | Scorecard cell detail | local vs community columns both rendered with source labels; `n=` shown; cells below `minSamples` read *insufficient evidence* in words |
 | E2E-M8-06-02 | e2e | export dialog | blocked while the setting is off, with a link to enable; after enabling, the preview shows real sample rows; Write produces the JSONL + manifest; axe-clean dark + RTL |
@@ -233,7 +234,7 @@ Default learning mode is shadow: compute proposals and scorecards while routing 
 | TC-M8-06-01 | Scorecard from real outcomes (exit criterion 3) | 1. After M3-09 and TC-M8-05-02 have produced real tasks, open Models › Scorecard 2. Pick `feature-impl` | ≥ 3 `(model, taskType)` cells show sample size, findings/100 LOC, test pass rate, rework rounds, latency and cost; every number is labelled *local* or *community* | ⬜ |
 | TC-M8-06-02 | Bounded, decaying adjustment | 1. Open a cell with `n ≥ 5` 2. Read the adjustment list 3. `orch models scorecard --json` | Every delta is within ±0.2 with a one-line explanation; the JSON shows the same values; the half-life in effect matches `learning.halfLifeDays` | ⬜ |
 | TC-M8-06-03 | Evidence vs community baseline | 1. Open the cell detail | Local metrics sit beside the community `evidence[]` entries (benchmark name, date, url) from the profile; disagreements are visible rather than silently overridden | ⬜ |
-| TC-M8-06-04 | Routing cites local evidence | 1. Preview a task of the adjusted type 2. Open "why this model" 3. Click the local-evidence chip | The reasons include `local-evidence`; the chip deep-links to the scorecard cell; the outcome rows behind the cell are listed | ⬜ |
+| TC-M8-06-04 | Routing cites local evidence | 1. Evaluate and explicitly approve a proposal into a new policy version 2. Preview that task type 3. Inspect the local-evidence chip | The reasons include `local-evidence`; the chip deep-links to the scorecard cell; the outcome rows behind the cell are listed | ⬜ |
 | TC-M8-06-05 | Reset | 1. Reset adjustments for one model 2. Preview the same task again | Reset is confirmed with consequence text and audited; the decision returns to the community-profile result; the adjustment history still shows what was removed | ⬜ |
 | TC-M8-06-06 | Negative: insufficient evidence | 1. Find a `(model, taskType)` cell with `n < minSamples` 2. Read the cell and the profile | Cell reads *insufficient evidence* in words with `n=`; no delta exists; routing for that pair is unchanged from the community profile | ⬜ |
 | TC-M8-06-07 | Negative: export blocked and anonymity | 1. With `telemetry.anonymisedExport: false`, run `orch outcomes export --anonymised --out /tmp/x` 2. Enable the setting, run with `--preview` 3. Run for real and `grep` the bundle for a repo path, a branch name, a task goal and the host id | Step 1 refuses with the setting named; step 2 prints sample rows without writing; step 3 writes the bundle and every grep returns nothing (data handling) | ⬜ |

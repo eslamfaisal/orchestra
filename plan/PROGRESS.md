@@ -212,3 +212,18 @@ Folder: `11-m10-ecosystem-launch/` · [README](11-m10-ecosystem-launch/README.md
 | 2026-09-15 | — | External feasibility review (astra) applied — see `REVIEW-RESPONSE-2026-09-15.md`. New step M0-09 (provider feasibility gates & evidence matrix); M1-05/M1-06 now depend on it (+1 d each); M3-05 +1 d (validation bound to commit); M2-03 no longer depends on M1-07. |
 | 2026-09-15 | M1-07 | Gated by ADR-008 (amended): terms resolution + M0-09 agy evidence row required before start; removed from every downstream dependency and acceptance criterion. |
 | 2026-09-15 | — | ADR-008 and ADR-014 amended; ADR-019…022 added; risks R17…R21 added; goals G2/G4 reworded; `00-foundations/14-provider-evidence-matrix.md` added. |
+
+| 2026-09-15 | — | Continued feasibility revision: completed missing M0-09 spec, reconciled contracts/acceptance, added ADR-023 (Proposed), canonical KPI contract and generated dependency graph. All 92 implementation steps remain not started. |
+| 2026-09-15 | — | Plan verification: 92 files / 11 milestones / 0 structural issues; verifier regression suite 9/9. Estimate sums: 55.5 d required MVP, 215 d required roadmap, 219 d including optional integrations; no runtime evidence claimed. |
+
+## Feasibility and release gates still open
+
+| Gate | Owner | Evidence needed | State |
+|---|---|---|---|
+| Claude/Codex selected-mode feasibility | Unassigned | M0-09 real CLI experiments, exact versions and fixtures | Not run |
+| Proposed ADRs including ADR-023 | Unassigned | Recorded decision and decider before affected implementation | Proposed |
+| Antigravity enablement | Unassigned | ADR-008 terms resolution and technical evidence; separate opt-in | Disabled; optional |
+| Isolated multi-user execution / untrusted plugin hosting | Unassigned | Separate architecture and boundary tests | Deferred beyond v1 |
+| KPI observation window | Unassigned | Actual ≥30-day interval with working instrumentation and canonical queries | Not begun |
+
+Plan edits and verifier tests do not change implementation status or clear these gates. See [review response](REVIEW-RESPONSE-2026-09-15.md).

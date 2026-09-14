@@ -97,7 +97,7 @@ export interface CapabilityRecord {
 }
 ```
 
-A `CapabilityRecord` is keyed by **provider + CLI version + execution mode** — the same operation can be `verified` in `interactive-pty` and `unsupported` in `headless` on the same binary. `unsupported` or `unverified` disables the affected *feature* for that provider/mode; it never invalidates the provider. The vocabulary and the filled table live in `14-provider-evidence-matrix.md`; the manifest is the machine-readable projection of it.
+A `CapabilityRecord` is keyed by **provider + CLI version + execution mode** — the same operation can be `verified` in `interactive-pty` and `unsupported` in `headless` on the same binary. `unsupported` or `unverified` disables the affected *feature* for that provider/mode; it disables that feature; failure of a mandatory M0-09 operation blocks the proposed release mode. The vocabulary and the filled table live in `14-provider-evidence-matrix.md`; the manifest is the machine-readable projection of it.
 
 **`promptProtocol`** carries, for every prompt kind: an `answerTransport` (`hook-response` · `permission-tool` · `app-server-rpc` · `elicitation` · `mcp-result` · `send-keys-acked` · `none`), an `ackSource` naming the *structured* signal that proves delivery (hook response consumed, RPC response, MCP tool result), and the answer-state semantics: a prompt moves `pending → submitted → acknowledged` only on that structured ack. Echoed terminal text, a later unrelated message, or a process exit never prove an approval succeeded. Where a kind's only transport is `send-keys-acked` and no documented ack event exists for that provider, the terminal state is `delivery_uncertain`, and the kind's capability record must be `limited` or `manual-only` — never `verified`. Full state set (M1-11 owns the definition): `pending | submitted | acknowledged | expired | cancelled | delivery_uncertain`.
 
@@ -131,7 +131,7 @@ Fixture drift = failing contract test = "vendor changed something" (M6-02 turns 
 - `telemetry.contract.spec.ts` — every fixture parses to ≥1 NormalizedEvent; unknown-type fixtures produce `ParseError` not throws.
 - `ratelimit.contract.spec.ts` — 429 fixtures produce a signal with `resetAt` or `retryAfterMs`.
 - `pane.contract.spec.ts` — `sendCommand` resolves only on ack; timeout returns `Err(AckTimeout)`.
-- `prompt.contract.spec.ts` — every prompt kind in manifest has an answer transport and a fixture round-trip.
+- `prompt.contract.spec.ts` — every declared supported prompt kind has a correlated answer fixture; manual-only/unsupported kinds disable programmatic controls.
 - `manifest.contract.spec.ts` — manifest validates; models non-empty; `cliVersionRange` matches fixture version.
 - `capability.contract.spec.ts` — every operation the adapter implements has a `CapabilityRecord` for each execution mode it claims; `limited`/`manual-only` records carry a `limitation`; any record that is not `unverified` carries `evidence` resolving to an existing fixture path or evidence-matrix row id; a record's `cliVersion` is inside `cliVersionRange`.
 

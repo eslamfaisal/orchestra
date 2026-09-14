@@ -9,7 +9,7 @@
 | Exit | **the MVP**: ≥ 2 real vendor CLIs live in tmux panes inside per-task git worktrees, visible and controllable in the browser, supported structured prompts surfaced in Attention and answerable through evidenced channels; manual-only kinds labelled, Quick Delegate returns a branch + diff, daemon restart reports persisted state and per-mode recovery limitations |
 
 ## Goal
-Replace the M0 fake process runner with the real substrate — tmux control mode, a single `SessionSupervisor` actor, git worktrees, an allowlisted `BinaryRegistry` — and ship the first three real adapters (Claude Code, Codex, Antigravity opt-in) with recorded fixtures and contract tests. On top of that: a Terminals grid with live xterm panes over a raw WebSocket, a Fleet screen to start sessions, the Interaction Bridge that turns every stop-and-ask into a durable `AgentPrompt` in an Attention queue, and a "Quick Delegate lite" that runs one task for one manually chosen provider in its own worktree. M1-13 is a hard acceptance gate on real CLIs.
+Replace the M0 fake process runner with the real substrate — tmux control mode, a single `SessionSupervisor` actor, git worktrees, an allowlisted `BinaryRegistry` — and ship the two required real adapters and an optional gated third adapter (Claude Code, Codex, Antigravity opt-in) with recorded fixtures and contract tests. On top of that: a Terminals grid with live xterm panes over a raw WebSocket, a Fleet screen to start sessions, the Interaction Bridge that turns every stop-and-ask into a durable `AgentPrompt` in an Attention queue, and a "Quick Delegate lite" that runs one task for one manually chosen provider in its own worktree. M1-13 is a hard acceptance gate on real CLIs.
 
 ## Why this milestone now
 The riskiest assumptions in the whole product are here (RISKS R1, R2, R3, R5): can we drive tmux control mode reliably, can we get structured prompts out of each CLI through official channels, and can we answer them round-trip without screen-scraping. Proving that on real CLIs before building intelligence (M2+) is decision D11.
@@ -17,7 +17,7 @@ The riskiest assumptions in the whole product are here (RISKS R1, R2, R3, R5): c
 ## Entry criteria
 - [ ] M0 ✅ (all 9 steps, TCs recorded).
 - [ ] `brew install tmux` (≥ 3.3); `tmux -V` recorded in ENVIRONMENT.md.
-- [ ] `claude` logged in (`claude /status` shows plan); Codex reinstalled (`codex --version` works, `codex login status` ok); `agy --version` ok (adapter opt-in).
+- [ ] `claude` logged in (`claude /status` shows plan); Codex reinstalled (`codex --version` works, `codex login status` ok); agy is not an entry requirement.
 - [ ] Scratch repo `~/orchestra-scratch/` initialised with a tiny Node project (used by all TCs; never a real project in M1).
 
 ## Exit criteria (= MVP definition, D11)
@@ -71,8 +71,8 @@ The riskiest assumptions in the whole product are here (RISKS R1, R2, R3, R5): c
 ## Milestone risks
 - R2 tmux control-mode parsing (M1-01 fuzz + fake tmux mitigate).
 - R3 Codex app-server drift (pin schema fixture; `exec --json` fallback exists from M1-06).
-- R5 prompt round-trip reliability (every transport has an ack + timeout + fallback; TC per prompt kind).
-- R4 Antigravity ToS (adapter opt-in; ToS ack stored; legal review noted in DECISIONS ADR-008).
+- R5 prompt round-trip reliability (each supported transport has a defined correlated outcome; uncertain/manual delivery is explicit; TC per prompt kind).
+- R4 Antigravity ToS (adapter opt-in; terms resolution required before enablement; ToS acknowledgement stored in DECISIONS ADR-008).
 - Usage cost of recording fixtures on real accounts: keep scenarios tiny; record once per CLI version.
 
 ## Parallelization

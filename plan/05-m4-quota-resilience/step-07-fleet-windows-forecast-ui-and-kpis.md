@@ -41,12 +41,7 @@ After this step the Fleet screen (v1 from M1-10) shows, per provider, every decl
 ### 4.1 Domain (entities, value objects, rules)
 No new domain types. The screen is a projection of `WindowState` (M4-01), `QuotaForecast` (M4-02), `ProviderAvailability` (M4-03), `ReserveStatus` (M4-04) and a new read-model `FleetKpis`. KPI definitions are fixed and documented in one place so the tooltip, the API and the docs cannot drift:
 
-- **K1 off-top-tier routing %** = `count(routing_decisions where dry_run = 0 and chosen_model.costTier < maxCostTier(provider)) / count(all non-dry-run decisions)` over the range. Target ≥ 60 % (G2).
-- **K2 window utilisation %** = mean over windows of `used / limit` at each window's *close* (rollover) inside the range; windows with no `limit` are excluded from the mean and counted in `excludedWindows`. Target ≥ 80 % (G2).
-- **K3 reroute success rate** = `count(rerouted tasks that later reached a terminal non-failed state) / count(routing.rerouted)` over the range; `null` when there were no reroutes.
-- **K4 quota-blocked time %** = `Σ time tasks spent in state blocked(reason: quota) / Σ time tasks spent in any non-terminal state` over the range. Lower is better; it is the honest counterweight to K2.
-
-Rules: every KPI is `confidence: 'estimate'` (K2 depends on estimated `used`); a KPI with too little data (`sampleCount < 5`) renders as "not enough data" rather than a misleading percentage; all four are computed from persisted rows, never from in-memory counters, so a restart does not reset them.
+The canonical definitions and planned query contracts are [foundation 15](../00-foundations/15-kpi-contract.md). K1 counts first-admitted tasks, K2 measures attributable productive usage per account/bucket/unit/window, K3 counts distinct rerouted tasks, and K4 clips quota-blocked task time to the selected range. Total used/limit is a diagnostic, not K2. Unknown/insufficient data is null with coverage counts. Never substitute estimated token sums for official credit/percentage usage. Implement the shared definition version and fixtures before exposing these KPIs.
 
 ### 4.2 Interfaces / contracts
 ```ts

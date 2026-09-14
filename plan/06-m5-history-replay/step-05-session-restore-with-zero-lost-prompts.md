@@ -11,10 +11,10 @@
 | Owner | |
 
 ## 1. Goal
-`kill -9` on `orchestrad` while an agent is waiting for a permission, question or plan approval no longer costs the user anything. On restart the daemon re-attaches to the `orchestra` tmux server, matches every live pane back to its `Session` row via `ORCH_SESSION_ID`, reconciles session states, replays the raw telemetry backlog it had persisted **before** parsing, re-derives the open `AgentPrompt`s, and pushes a snapshot + delta to every reconnecting UI. The same prompt id is answerable from the web seconds after restart, the agent continues, and the metric `restore_lost_prompts` reads `0`.
+After daemon restart, reconcile surviving sessions and replay durably captured events without duplicating records. Preserve prompt identity and report whether each captured request is still answerable, expired, cancelled or delivery-uncertain. Capture during downtime and provider reconnection are capability-specific; no surviving pane, socket or database row by itself proves that a provider request remains answerable.
 
 ## 2. Why
-- 1.0 Definition of Done (`ROADMAP.md`, source plan §20): "restore with no lost prompts". `12-ux-principles.md` reliability budget: "Restore — re-attach tmux + replay events; durable captured prompts with explicit recovery outcomes".
+- 1.0 Definition of Done (`ROADMAP.md`, source plan §20): "restore durable captured prompts with explicit outcomes". `12-ux-principles.md` reliability budget: "Restore — re-attach tmux + replay events; durable captured prompts with explicit recovery outcomes".
 - D2: tmux is the substrate precisely so that agents outlive the daemon; that promise is only real if the daemon can find them again and rebuild the interaction state.
 - D13: one `SessionSupervisor` owns all tmux state, so reconcile is a single, testable actor operation rather than a scattered recovery path.
 - D14: "every agent stop-and-ask becomes a durable `AgentPrompt`" — durable means it survives process death, including the window between an agent asking and the daemon persisting.
@@ -28,7 +28,7 @@
 - Raw telemetry inbox: `telemetry_inbox` table written by the hooks receiver / stream readers **before** any parsing; drained asynchronously; replayed on boot.
 - `RederiveOpenPrompts`: rebuild the open-prompt set from `agent_prompts` + replayed inbox + last events; re-deliver answered-but-undelivered answers over ack-based transports only.
 - `ReattachStrategy` per provider (`pty-pane` vs `stdio-child`) with an explicit, documented outcome for transports the daemon owned.
-- Restore metrics (`restore_lost_prompts`, `restore_duration_ms`, `restore_sessions_*`, `telemetry_inbox_backlog`) + `restore.*` events + a `daemon.restarted` timeline marker.
+- Restore metrics (`restore_persisted_unaccounted`, `restore_duration_ms`, `restore_sessions_*`, `telemetry_inbox_backlog`) + `restore.*` events + a `daemon.restarted` timeline marker.
 - WS reconnect protocol: `subscribe { topics, sinceEventId }` → `snapshot` + ordered `delta`, with re-snapshot on sequence gap.
 - Restore banner + per-session restore badges in the web UI; Attention shows recovered prompts with a "recovered after restart" note.
 - `kill -9` test harness (`scripts/restore-soak.sh`) and an automated 5-run soak on FakeProvider plus the manual run on a real CLI.
@@ -43,7 +43,7 @@
 ### 4.1 Domain (entities, value objects, rules)
 - `SessionIdentity` value object: `{ sessionId, hostId, tmuxWindow, tmuxPane, launchedAt, paneStartCommand }` — what must match for a pane to be adopted.
 - `ReconcileVerdict`: `'matched_alive' | 'matched_dead' | 'pane_missing' | 'orphan_pane' | 'transport_lost' | 'stale_row'`.
-- `RestoreRun` entity: `{ id, startedAt, finishedAt, sessionsSeen, matched, crashed, orphans, inboxReplayed, promptsOpenBefore, promptsRecovered, promptsLost, durationMs }`.
+- `RestoreRun` entity: `{ id, startedAt, finishedAt, sessionsSeen, matched, crashed, orphans, inboxReplayed, promptsOpenBefore, answerableRecovered, expired, cancelled, deliveryUncertain, captureGaps, persistedUnaccounted, durationMs }`.
 - `PromptRecovery` value object: `{ promptId, previousState, newState, reason: 'still_open' | 'answer_redelivered' | 'expired' | 'session_gone' | 'superseded' }`.
 - Rules (pure, 100 % branch):
   - A pane may only be adopted when its `ORCH_SESSION_ID` equals the DB row's id **and** `hostId` matches; a pane-id match alone is never sufficient (tmux reuses `%N` after a pane closes).
@@ -99,7 +99,7 @@ Migration `0054_restore` (extends `04-domain-model.md` §4):
 - `telemetry_inbox(id text pk, received_at text not null, provider_id text not null, channel text not null, session_id_hint text null, external_id text null, headers_json text null, source_generation text not null, body text not null, state text not null default 'pending', attempts integer not null default 0, error text null, parsed_at text null)`; unique `(provider_id, session_id_hint, source_generation, channel, external_id)` where `external_id` is not null (idempotency, matching the ingestion rule in `04-domain-model.md` §3); index `(state, received_at)`.
 - `sessions` add `external_session_id text null` (the vendor's own session/thread id, captured at `SessionStart`), `reattach_kind text not null default 'pty-pane'`, `restored_at text null`, `restore_run_id text null`.
 - `agent_prompts` add `external_prompt_id text null`, `recovered_count integer not null default 0`, `last_delivery_at text null`; unique `(session_id, external_prompt_id)` where not null.
-- `restore_runs(id text pk, started_at, finished_at, sessions_seen, matched, crashed, orphans, inbox_replayed, prompts_open_before, prompts_recovered, prompts_lost, duration_ms, report_json)`.
+- `restore_runs(id text pk, started_at, finished_at, sessions_seen, matched, crashed, orphans, inbox_replayed, prompts_open_before, answerable_recovered, expired_count, cancelled_count, delivery_uncertain_count, capture_gaps, persisted_unaccounted, duration_ms, report_json)`.
 - New events (extension of the catalog in `04-domain-model.md` §3): `daemon.restarted`, `restore.started`, `restore.completed`, `restore.session_reconciled`, `restore.prompt_recovered`, `restore.prompt_lost`, `restore.orphan_pane`, `telemetry.backlog_replayed`.
 - Config (Zod): `features.restore.enabled` (default `true`), `restore.reconcileTimeoutMs` (5 000), `restore.inboxMaxAttempts` (5), `restore.inboxBatch` (500), `restore.promptGraceMs` (120 000 — how long an open prompt survives a restart before expiring), `restore.soakRuns` (5).
 
@@ -110,13 +110,13 @@ Migration `0054_restore` (extends `04-domain-model.md` §4):
   `list-panes -a -F '#{window_id}\t#{pane_id}\t#{pane_pid}\t#{pane_dead}\t#{pane_title}\t#{@orch_session_id}\t#{pane_start_command}'`
   (verify each format variable, especially `@user_option` interpolation and `pane_start_command`, against the tmux docs at step start), plus `show-environment -t orchestra` as the fallback carrier. All of it goes through the M1-01 driver owned by the supervisor (D13) — no direct `tmux` spawning elsewhere.
 - **Hooks receiver durability:** `/hooks/:provider/:sessionId` now does exactly three things before anything else: Zod-validate the envelope (not the vendor body), `TelemetryInboxPort.put(raw)`, then `fsync` via the SQLite WAL commit. Only then does it hand the record to the parser to compute a hook response within the vendor's deadline. If parsing fails or times out, the receiver still answers with the manifest's safe default (`ask`/`defer`) and the record stays `pending` for replay. Stream-json and app-server readers use the same inbox before parsing.
-- **What cannot be saved, honestly:** while the daemon is dead, an agent's hook POST gets a connection refused. Per `03-architecture.md` §8 the CLI then falls back to its own native prompt in the pane; the agent is *not* lost, it is waiting on the PTY. Restore therefore re-derives that prompt from the session log / stream backlog and opens it with transport `send-keys-acked`, which is exactly the documented fallback in D14. The zero-lost guarantee is about **prompt state**, never about answering HTTP while the process is dead.
+- **Downtime capture:** only a verified surviving gateway/log spool can replay requests emitted while the daemon is unavailable. A direct hook failure may leave a native prompt, expire, or lose the request, depending on the provider mode. Without replay evidence report a capture gap and offer manual inspection; never synthesize an externally answerable prompt from terminal text.
 - **Re-attach per provider (verify at step start):**
   - *Claude Code* — interactive pane: `pty-pane`. The pane process is untouched; the hooks config written at launch still points at `http://127.0.0.1:<port>/hooks/claude/<sid>`, so the daemon must rebind the **same port** (boot fails loudly if the port is taken, rather than drifting to another). Open prompts are re-derived from the session JSONL tail (M5-02 offsets) plus the inbox. (verify hook-config and session-log behaviour against Claude Code docs at step start)
   - *Codex* — if M1-06 runs `codex app-server` as a daemon-owned child process, that transport dies with the daemon: `stdio-child`, `reattach → { status: 'unavailable', resumable: manifest.limits.resume }`. The session is marked `crashed`, its open prompts `cancelled(session_gone)`, and Attention offers "resume thread" using the stored `external_session_id`. If M1-06 instead runs app-server inside a tmux pane behind a relay, the adapter reports `pty-pane`. Which one applies is an M1-06 fact — the step starts by reading that adapter's transport decision, not by assuming one. (verify against Codex docs and the pinned app-server schema at step start)
   - *Antigravity* — `-p --input-format stream-json` over stdio is likewise `stdio-child`; interactive `agy` panes are `pty-pane`. C11 forbids any recovery path that touches the Service backend; recovery is limited to the local binary. (verify against Antigravity docs at step start)
 - **Boot order** (daemon lifecycle hook, all inside `features.restore.enabled`): config → DB migrations → event store → `daemon.restarted` event → tmux attach + `ReconcileSessions` → `ReplayTelemetryInbox` (drain to empty or `reconcileTimeoutMs`, whichever first, then continue in background) → `RederiveOpenPrompts` → `VerifyRecordingPipes` (M5-01) → HTTP/WS listeners open. The HTTP port opens **after** reconcile so a UI never sees a half-restored world; `/health` reports `restoring` from a tiny bootstrap listener.
-- Metrics (Prometheus, `/metrics`): gauge `restore_lost_prompts`, gauge `telemetry_inbox_backlog{state}`, histogram `restore_duration_ms`, counters `restore_sessions_total{verdict}`, `restore_prompts_recovered_total{reason}`.
+- Metrics (Prometheus, `/metrics`): gauge `restore_persisted_unaccounted`, gauge `telemetry_inbox_backlog{state}`, histogram `restore_duration_ms`, counters `restore_sessions_total{verdict}`, `restore_prompts_recovered_total{reason}`.
 
 ### 4.5 API / UI surface
 - `GET /restore/last` → `RestoreRun` (+ per-session decisions); `GET /restore/runs?limit=` → history.
@@ -142,7 +142,7 @@ BOOT
         answered & send-keys-acked                  ──▶ needs_user_confirmation
         open older than promptGraceMs & session gone ──▶ expired
   5 VerifyRecordingPipes (M5-01) ──▶ re-pipe + recording.gap if needed
-  6 restore.completed{restore_lost_prompts} ──▶ metrics ──▶ open HTTP/WS
+  6 restore.completed{restore_persisted_unaccounted} ──▶ metrics ──▶ open HTTP/WS
 UI RECONNECT        subscribe{sinceEventId} ──▶ snapshot(asOfEventId) ──▶ delta… ──▶ Attention shows the SAME prompt id
 ```
 
@@ -173,7 +173,7 @@ A surviving session gateway is required only for modes advertised as capturing t
 - [ ] Metrics + `restore.*` events + `daemon.restarted` marker consumed by M5-04's event lane.
 - [ ] WS `sinceEventId` snapshot+delta protocol, gap detection and re-snapshot on both server and client.
 - [ ] Web: `RestoreBanner`, `RESTORED` badges, Attention "recovered after restart" note and "re-send answer" action, restore report drawer.
-- [ ] `scripts/restore-soak.sh`: launch N FakeProvider sessions with open prompts, `kill -9`, restart, assert `restore_lost_prompts == 0`, repeat `restore.soakRuns` times; wire into CI (FakeProvider only) and nightly.
+- [ ] `scripts/restore-soak.sh`: launch N FakeProvider sessions with open prompts, `kill -9`, restart, assert `restore_persisted_unaccounted == 0`, repeat `restore.soakRuns` times; wire into CI (FakeProvider only) and nightly.
 - [ ] Package README (`application/restore`) + `PROGRESS.md` row + `RISKS.md` entry for `stdio-child` providers.
 
 ## 6. Tests
@@ -182,23 +182,23 @@ A surviving session gateway is required only for modes advertised as capturing t
 |---|---|---|---|
 | UT-M5-05-01 | unit (fast-check) | `reconcile()` over random pane/row sets incl. recycled pane ids, duplicate `ORCH_SESSION_ID`, missing options | total function, order-independent, never adopts on pane-id match alone; duplicates → one `matched_alive` + one `orphan_pane`, never two adoptions |
 | UT-M5-05-02 | unit | prompt recovery rules for every `(previousState × transport × session verdict)` combination | `send-keys-acked` answers are never auto-redelivered; `open` keeps its id; `session_gone` cancels; grace-period expiry works; 100 % branch |
-| UT-M5-05-03 | unit | `restore_lost_prompts` computation on hand-built before/after sets | counts only prompts in none of the terminal/open states; zero for all legitimate paths |
+| UT-M5-05-03 | unit | `restore_persisted_unaccounted` computation on hand-built before/after sets | counts only prompts in none of the terminal/open states; zero for all legitimate paths |
 | AT-M5-05-01 | adapter contract | `reattach.contract.spec.ts` for claude/codex/agy fixtures | every adapter declares a `ReattachKind`; `stdio-child` adapters return `unavailable` with a `resumable` flag and never throw |
-| IT-M5-05-01 | integration (real tmux + FakeProvider) | 5 sessions, 2 with open prompts; `SIGKILL` daemon; restart | all 5 matched; both prompts still `open` with the same ids; `restore_lost_prompts=0`; states correct |
+| IT-M5-05-01 | integration (real tmux + FakeProvider) | 5 sessions, 2 with open prompts; `SIGKILL` daemon; restart | all 5 matched; both prompts still `open` with the same ids; `restore_persisted_unaccounted=0`; states correct |
 | IT-M5-05-02 | integration | POST 50 hook payloads while the parser is stubbed to throw; restart | all 50 rows in `telemetry_inbox`; after restart all parse and ingest exactly once (no duplicate events by `(channel, externalId)`) |
 | IT-M5-05-03 | integration | kill a pane externally (`tmux kill-window`) while the daemon is down | session → `crashed`, prompts `cancelled(session_gone)`, one `restore.session_reconciled` event, no exception |
 | IT-M5-05-04 | integration | an unknown pane with `ORCH_SESSION_ID=bogus` present at boot | classified `orphan_pane`, Attention item created, pane still alive afterwards (never killed) |
 | IT-M5-05-05 | integration | answered-but-undelivered prompt with an ack-based transport | re-delivered exactly once after restore; `prompt.delivered` then `acknowledged`; a second restore does not re-deliver again |
-| IT-M5-05-06 | integration (soak) | `restore-soak.sh` with `soakRuns=5` | `restore_lost_prompts=0` in all 5 runs; `restore_duration_ms` p95 ≤ 5 000 ms with 20 sessions |
+| IT-M5-05-06 | integration (soak) | `restore-soak.sh` with `soakRuns=5` | `restore_persisted_unaccounted=0` in all 5 runs; `restore_duration_ms` p95 ≤ 5 000 ms with 20 sessions |
 | E2E-M5-05-01 | e2e (Playwright + FakeProvider) | UI open with a prompt visible; daemon killed and restarted | banner appears, Attention shows the same prompt id, answering it succeeds; WS re-subscribed with `sinceEventId` and received no duplicate events |
 
 ### 6.2 Manual test cases (run by you before marking ✅)
 | ID | Scenario | Steps | Expected result | Status |
 |---|---|---|---|---|
-| TC-M5-05-01 | `kill -9` with an open permission prompt on real Claude Code | 1. Start a Claude session in `~/orchestra-scratch/`. 2. Ask it to delete a file so a `PreToolUse` permission prompt opens; note the prompt id. **Do not answer.** 3. `kill -9 $(pgrep -f orchestrad)`. 4. `tmux ls` and check the pane. 5. Restart the daemon; watch `/health`. 6. Open Attention and approve. | tmux session and pane still alive in step 4; within 5 s of restart the same prompt id is `open`; `curl 127.0.0.1:4300/metrics \| grep restore_lost_prompts` prints `0`; approving lets the agent proceed and the tool result appears in the transcript | ⬜ |
-| TC-M5-05-02 | Five consecutive kills (resilience) | 1. Repeat TC-01 five times in a row on the same host, varying the moment of the kill (before the prompt, during, after the answer is queued). | `restore_lost_prompts=0` on all five; no duplicate prompts; no duplicate messages in the transcript; `restore_runs` has 5 rows with sane counts | ⬜ |
+| TC-M5-05-01 | `kill -9` with an open permission prompt on real Claude Code | 1. Start a Claude session in `~/orchestra-scratch/`. 2. Ask it to delete a file so a `PreToolUse` permission prompt opens; note the prompt id. **Do not answer.** 3. `kill -9 <recorded-experiment-daemon-pid>`. 4. `tmux ls` and check the pane. 5. Restart the daemon; watch `/health`. 6. Open Attention and approve. | tmux session and pane still alive in step 4; within 5 s reconcile the same captured prompt id and its actual provider outcome; `curl 127.0.0.1:4300/metrics \| grep restore_persisted_unaccounted` prints `0`; only a verified still-pending provider request can be approved; otherwise show expired/cancelled/delivery-uncertain outcome | ⬜ |
+| TC-M5-05-02 | Five consecutive kills (resilience) | 1. Repeat TC-01 five times in a row on the same host, varying the moment of the kill (before the prompt, during, after the answer is queued). | `restore_persisted_unaccounted=0` on all five; no duplicate prompts; no duplicate messages in the transcript; `restore_runs` has 5 rows with sane counts | ⬜ |
 | TC-M5-05-03 | Hook backlog replay | 1. With a Claude session running a multi-tool task, `kill -9` the daemon mid-task. 2. Wait 30 s while the agent keeps working in the pane. 3. Restart. | After restart the transcript and the event list contain every tool call made during the outage (from the session-log tail and/or inbox), in order, with no gaps and no duplicates; `telemetry.backlog_replayed` event present | ⬜ |
-| TC-M5-05-04 | Prompt asked *while* the daemon is down (negative-path honesty) | 1. `kill -9` the daemon. 2. In the pane, drive the agent to a permission prompt (it shows its own native prompt). 3. Restart the daemon. | Session is `waiting_for_input`; an `AgentPrompt` for that request exists in Attention with transport `send-keys-acked` and a "re-derived after restart" note; answering it from the web sends the mapped keystrokes and the agent continues; `restore_lost_prompts` is still `0` | ⬜ |
+| TC-M5-05-04 | Prompt asked *while* the daemon is down (negative-path honesty) | 1. `kill -9` the daemon. 2. In the pane, drive the agent to a permission prompt (it shows its own native prompt). 3. Restart the daemon. | Replay only when the selected mode has a durable spool and verified request retention; otherwise show capture gap/manual inspection. Persisted-unaccounted is not used as a downtime-capture success metric | ⬜ |
 | TC-M5-05-05 | Codex session restart behaviour | 1. Start a Codex session and let it run. 2. `kill -9` the daemon. 3. Restart. | Outcome matches the adapter's declared `ReattachKind`: `pty-pane` → session `running`/`waiting_for_input` and controllable again; `stdio-child` → session `crashed` with a "resume thread" action in Attention using the stored `external_session_id`, and the reason is shown, not hidden | ⬜ |
 | TC-M5-05-06 | Antigravity (opt-in) restart | 1. With ToS acknowledged, run an interactive `agy` pane. 2. `kill -9`; restart. | Interactive pane re-adopted like Claude; a headless stream-json agy run is reported `crashed` with a resume hint; no call touches anything but the local binary (C11) | ⬜ |
 | TC-M5-05-07 | Pane killed while the daemon is down (negative) | 1. `kill -9` the daemon. 2. `tmux kill-window -t <window>` for one running session. 3. Restart the daemon. | That session is `crashed` (not `stopped`), its open prompts are `cancelled` with reason `session_gone`, Attention explains it, other sessions are unaffected | ⬜ |
@@ -206,7 +206,7 @@ A surviving session gateway is required only for modes advertised as capturing t
 | TC-M5-05-09 | Port conflict at restart (negative) | 1. Occupy `:4300` with `nc -l 4300`. 2. Start the daemon. | Boot fails fast with a clear error naming the port and the consequence ("agents' hook configs point at this port"); it never silently binds a different port; freeing the port and restarting restores normally | ⬜ |
 | TC-M5-05-10 | UI reconnect: snapshot + delta | 1. With Terminals and Attention open, restart the daemon. 2. Watch the network panel. | Client re-subscribes with `sinceEventId`; one `snapshot` then ordered `delta`s; no duplicated Attention rows; terminals re-attach and the pane's live output resumes; banner shows the restore summary | ⬜ |
 | TC-M5-05-11 | Recording continuity across restart | 1. Do TC-01 while recording is enabled. 2. After restart, open Timeline (M5-04). | The `.cast` has no gap across the outage (M5-01 TC-05 behaviour), `daemon.restarted` shows as a marker on the event lane, and `VerifyRecordingPipes` logged the pipe as active | ⬜ |
-| TC-M5-05-12 | Restore with 20 live sessions (load) | 1. Start 20 FakeProvider sessions plus the 2 real ones. 2. `kill -9`; restart; time it. | Reconcile completes ≤ 5 s; `/health` reports `restoring` then `ok`; memory stays within the 300 MB idle budget; `restore_lost_prompts=0` | ⬜ |
+| TC-M5-05-12 | Restore with 20 live sessions (load) | 1. Start 20 FakeProvider sessions plus the 2 real ones. 2. `kill -9`; restart; time it. | Reconcile completes ≤ 5 s; `/health` reports `restoring` then `ok`; memory stays within the 300 MB idle budget; `restore_persisted_unaccounted=0` | ⬜ |
 
 ### 6.3 Review regression scenarios
 - [ ] Crash before capture vs after durable capture: report different outcomes.
@@ -218,7 +218,7 @@ A surviving session gateway is required only for modes advertised as capturing t
 ## 7. Acceptance criteria (Definition of Done)
 - [ ] The review reconciliation contract and all §6.3 regression scenarios pass; archive evidence alongside the original test cases.
 - [ ] All TC-M5-05-01 … 12 pass, with TC-01/TC-02 executed on a real Claude Code session (the 1.0 DoD item).
-- [ ] `restore_lost_prompts == 0` across ≥ 5 consecutive `kill -9` runs on real CLIs and across the automated soak (IT-06).
+- [ ] `restore_persisted_unaccounted == 0` across ≥ 5 consecutive `kill -9` runs on real CLIs and across the automated soak (IT-06).
 - [ ] Every raw telemetry payload is persisted to `telemetry_inbox` before any parsing, and replay is exactly-once by `(channel, external_id)` (IT-02, TC-03).
 - [ ] `reconcile()` and the prompt-recovery rules are at 100 % branch coverage and never adopt a pane on pane-id match alone.
 - [ ] Panes Orchestra does not own are never killed, modified or resized by restore (TC-08).
@@ -229,7 +229,7 @@ A surviving session gateway is required only for modes advertised as capturing t
 
 ## 8. Risks / open questions
 - tmux carrier semantics: window user options (`@orch_session_id`), `pane_title` and `show-environment` all have version-dependent behaviour; `pane_start_command` may be empty for panes created before a tmux restart (verify all of them against the tmux man page for the pinned version at step start). Three independent carriers plus the DB row is the mitigation; if all three are absent the pane is an `orphan_pane`, never a guess.
-- Codex `app-server` and Antigravity stdio transports are daemon-owned; whether a restart can re-attach at all depends on M1-06/M1-07's process model (verify against Codex and Antigravity docs at step start). If they cannot, the honest outcome is `crashed` + resume, and the milestone's zero-lost-prompt claim must be stated as "prompts are never lost; sessions on `stdio-child` transports are reported as crashed with a resume path".
+- Managed protocol lifetimes depend on the selected gateway/process mode. Reconnection requires version-specific evidence; failed reconnection records transport_lost and cancels/marks uncertain old approvals. Starting another execution never restores those approvals automatically.
 - Claude Code hook configs written at launch embed the daemon URL. Changing the port between restarts silently breaks the hook channel — hence fail-fast on port conflict (TC-09). Long-term, a per-session token in the hook URL (M9-01) must be stable across restarts too.
 - Prompts asked while the daemon was down arrive only with `send-keys-acked`, the weakest transport (D14). Auto-answer policies must refuse to act on re-derived keystroke prompts without user confirmation; verify this against the M1-11 auto-answer policy defaults.
 - Inbox write on the hot path adds one SQLite commit per hook. The load test must confirm hook round-trip stays inside the vendor's hook deadline; if not, batch commits with `PRAGMA synchronous=NORMAL` under WAL and document the (small) durability window.

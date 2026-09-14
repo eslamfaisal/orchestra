@@ -163,7 +163,7 @@ orch history import ──▶ POST /history/imports ──▶ ImportSessionLog �
 - [ ] All TC-M5-02-01 … 09 pass on real Claude Code and Codex (agy if opted in).
 - [ ] Ingestion is idempotent: replaying any fixture or importing any file twice inserts 0 rows (UT-01, TC-05).
 - [ ] No tool argument or message content containing a fixture secret is stored unredacted (UT-03 + grep over DB dump).
-- [ ] Contract tests for all three adapters include a conversation fixture pinned to the CLI version in `RECORDED.md`.
+- [ ] Contract tests for required Claude/Codex adapters and any enabled optional adapter include a conversation fixture pinned to the CLI version in `RECORDED.md`.
 - [ ] Transcript visible in the web ≤ 2 s after the message appears in the pane (E2E-01, TC-01).
 - [ ] Restart-safe tailing proven (IT-02, TC-08).
 - [ ] Attachments never copied from outside the session's cwd/worktree; size cap enforced.
