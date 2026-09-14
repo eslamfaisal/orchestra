@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm install*)", "Bash(pnpm build*)", "Bash(pnpm test*)", "Bash(pnpm lint*)", "Bash(pnpm typecheck*)", "Bash(pnpm depcruise*)", "Bash(pnpm --filter *)", "Bash(pnpm run *)",
+      "Bash(node *)", "Bash(npx vitest*)", "Bash(npx playwright*)",
+      "Bash(git status*)", "Bash(git diff*)", "Bash(git log*)", "Bash(git add *)", "Bash(git commit *)", "Bash(git checkout -b *)", "Bash(git switch *)", "Bash(git branch*)", "Bash(git worktree list*)",
+      "Bash(ls *)", "Bash(cat *)", "Bash(grep *)", "Bash(rg *)", "Bash(find *)", "Bash(wc *)", "Bash(tmux -L orchestra *)", "Bash(tmux -V)"
+    ],
+    "deny": [
+      "Bash(git push --force*)", "Bash(rm -rf /*)", "Read(~/.claude/**)", "Read(~/.codex/**)", "Read(~/.config/agy/**)", "Read(~/.orchestra/token)"
+    ]
+  }
+}
