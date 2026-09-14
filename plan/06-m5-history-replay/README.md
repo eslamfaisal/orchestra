@@ -4,7 +4,7 @@
 |---|---|
 | Folder | `plan/06-m5-history-replay/` |
 | Steps | 6 (M5-01 … M5-06) |
-| Effort | ~14 days |
+| Effort | 14 working days (sum of step estimates; optional work included) |
 | Depends on | M1 (live fleet: M1-02 supervisor, M1-08 telemetry plane, M1-11 Interaction Bridge) |
 | Unblocks | M7-03 (PWA offline history + restore semantics), M9-03 (audit export reuses bundle format), M9-05 (`RecordingPort` → S3) |
 | Status | ⬜ Not started |
@@ -46,12 +46,12 @@ After M5, every agent session Orchestra runs is **recorded, captured, searchable
 
 | ID | File | Title | Effort | Depends on |
 |---|---|---|---|---|
-| M5-01 | [step-01-pane-recorder-asciicast-v2.md](step-01-pane-recorder-asciicast-v2.md) | Pane recorder (asciicast v2) | 2.5 d | M1-02 |
-| M5-02 | [step-02-conversation-and-tool-call-capture-v2.md](step-02-conversation-and-tool-call-capture-v2.md) | Conversation & tool-call capture v2 | 2.5 d | M1-08 |
-| M5-03 | [step-03-fts5-search.md](step-03-fts5-search.md) | FTS5 search | 1.5 d | M5-02 |
-| M5-04 | [step-04-timeline-and-replay-ui.md](step-04-timeline-and-replay-ui.md) | Timeline & Replay UI | 3 d | M5-01, M5-03 |
-| M5-05 | [step-05-session-restore-with-zero-lost-prompts.md](step-05-session-restore-with-zero-lost-prompts.md) | Session restore with zero lost prompts | 2.5 d | M1-11 |
-| M5-06 | [step-06-retention-redaction-export-import.md](step-06-retention-redaction-export-import.md) | Retention, redaction, export/import | 2 d | M5-04 |
+| M5-01 | [step-01](step-01-pane-recorder-asciicast-v2.md) | Pane recorder (asciicast v2) | 2.5 d | M1-02, M1-01, M0-05 |
+| M5-02 | [step-02](step-02-conversation-and-tool-call-capture-v2.md) | Conversation & tool-call capture v2 | 2.5 d | M1-08, M1-05, M1-06, M5-01 |
+| M5-03 | [step-03](step-03-fts5-search.md) | FTS5 search | 1.5 d | M5-02, M0-05, M0-07 |
+| M5-04 | [step-04](step-04-timeline-and-replay-ui.md) | Timeline & Replay UI | 3 d | M5-01, M5-02, M5-03, M1-03, M0-07 |
+| M5-05 | [step-05](step-05-session-restore-with-zero-lost-prompts.md) | Session restore with durable captured prompts with explicit recovery outcomes | 2.5 d | M1-11, M1-02, M1-01, M1-08, M0-05, M0-06, M5-01 |
+| M5-06 | [step-06](step-06-retention-redaction-export-import.md) | Retention, redaction, export/import | 2 d | M5-04, M5-01, M5-02, M5-03, M0-04 |
 
 ## What you can test after this milestone
 
@@ -100,3 +100,6 @@ Preconditions: M5 build running with `features.history.recorder=true`, `features
 - Shared code to land first (in M5-01, day 1): `packages/core/src/redaction/` (rules + streaming redactor) — used by M5-01 (PTY bytes), M5-02 (tool args), M5-06 (export).
 - Do not run M5-05 restart tests while a load test is recording; the `kill -9` test needs a quiet host to attribute lost prompts correctly.
 - Nightly load harness (`10-testing-strategy.md`) is switched on at the end of M5-01 (recorder is the biggest new I/O consumer).
+
+## Revised release boundary (2026-09-15)
+Complete every required step above and its regression scenarios; optional gated steps do not block the milestone. [DEPENDENCIES.md](../DEPENDENCIES.md) gives the actual order. Capability-specific provider evidence, explicit recovery outcomes and commit-bound validation govern the exit criteria; no live result is implied by this plan update.

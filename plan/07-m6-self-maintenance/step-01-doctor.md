@@ -4,7 +4,7 @@
 |---|---|
 | Milestone | M6 — Self-maintenance |
 | Status | ⬜ Not started |
-| Depends on | M1-04 (BinaryRegistry), M2-03 (full manifests), M1-08 (`orch` CLI scaffold, telemetry pipeline) |
+| Depends on | M1-04, M2-03, M1-08 |
 | Estimated effort | 2.5 days |
 | Packages touched | `packages/core`, `packages/sdk`, `apps/daemon`, `apps/cli`, `packages/providers/claude`, `packages/providers/codex`, `packages/providers/agy` |
 | Risk | Medium |

@@ -4,7 +4,7 @@
 |---|---|
 | Milestone | M4 — Quota, budgets, resilience |
 | Status | ⬜ Not started |
-| Depends on | M4-02 |
+| Depends on | M4-02, M3-02 |
 | Estimated effort | 2 days |
 | Packages touched | `packages/core`, `packages/catalog` (schemas), `apps/daemon` (application/policy, application/quota, interface/http), `apps/web` (Attention + mission banner) |
 | Risk | Medium |

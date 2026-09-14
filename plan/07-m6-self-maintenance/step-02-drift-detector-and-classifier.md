@@ -4,7 +4,7 @@
 |---|---|
 | Milestone | M6 — Self-maintenance |
 | Status | ⬜ Not started |
-| Depends on | M6-01 (Doctor, `driftHint`), M4-01 (quota signals), M1-08 (telemetry pipeline), M0-05 (event store) |
+| Depends on | M6-01, M4-01, M1-08, M0-05 |
 | Estimated effort | 2.5 days |
 | Packages touched | `packages/core`, `packages/sdk`, `apps/daemon`, `apps/cli` |
 | Risk | High |

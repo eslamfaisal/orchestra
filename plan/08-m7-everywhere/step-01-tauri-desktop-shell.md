@@ -4,8 +4,8 @@
 |---|---|
 | Milestone | M7 — Everywhere |
 | Status | ⬜ Not started |
-| Depends on | M1-13 (MVP acceptance), M1-09 (`/term` raw WS), M1-10 (Fleet start-session wizard), M1-11 (Attention queue), M1-02 (pane reconcile/adoption), M0-04 (daemon config/token/single-instance lock) |
-| Estimated effort | 4 days |
+| Depends on | M1-13, M1-09, M1-10, M1-11, M1-02, M0-04 |
+| Estimated effort | 3 days |
 | Packages touched | `apps/desktop` (`src-tauri/`, `capabilities/`, `binaries/`, `resources/`), `apps/daemon` (bundle script, `--port`/`--adopt` flags, `desktop.*` config), `apps/web` (shell bridge, folder picker, quit-behaviour setting), `packages/sdk` (shell bridge DTOs), `tools/scripts` (`build-sidecar.sh`), `.github/workflows` (desktop build job, wired fully in M7-02) |
 | Risk | High (R7 — native modules vs packaging; ADR-005 is resolved here) |
 | Owner | |

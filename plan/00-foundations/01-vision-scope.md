@@ -61,7 +61,7 @@ Each KPI has exactly one definition, one denominator and one documented treatmen
 | Cross-review coverage % (G3) | mission tasks with a review round by an independent reviewer identity (ADR-022) | mission tasks whose TaskType requires review | tasks with `degraded_same_vendor` count as uncovered |
 | Avoidable-interruption rate (G4) | pauses where eligible capacity existed at pause time | all pauses | pauses with no capacity snapshot are counted as avoidable (conservative) |
 | Reroute success rate · time-to-detect drift · remediation time (G6) | per `doctor.*` evidence metrics | attempted reroutes / detected drifts | — |
-| Restore outcome mix (G5) | counts per recovery outcome, reported as a mix | restore attempts | never collapsed into a single "zero lost prompts" number |
+| Restore outcome mix (G5) | counts per recovery outcome, reported as a mix | restore attempts | never collapsed into a single "durable captured prompts with explicit recovery outcomes" number |
 
 ## Promises we deliberately do not make
 Orchestra orchestrates other vendors' CLIs. Anything it cannot observe or control, it does not promise. These are product requirements, not caveats bolted on later — every acceptance criterion in the plan must be phrased in the right-hand column.
@@ -72,7 +72,7 @@ Orchestra orchestrates other vendors' CLIs. Anything it cannot observe or contro
 | "Never blocked" | reduce avoidable interruptions; pause clearly and explain when no eligible capacity exists |
 | Exact universal remaining quota | official observations where the vendor exposes them; otherwise a labelled estimate, or `unknown` |
 | Hard spending caps while tasks run | **admission** budgets with a documented in-flight overshoot allowance, unless the provider itself enforces a cap (ADR-021) |
-| "Zero lost prompts in every failure" | durable captured prompts, explicit per-outcome recovery reporting, and declared failure boundaries |
+| "Durable captured prompts with explicit recovery outcomes in every failure" | durable captured prompts, explicit per-outcome recovery reporting, and declared failure boundaries |
 | Complete historical working-tree replay | recorded commits plus explicitly captured snapshots; uncaptured uncommitted state is labelled as a gap |
 | Automatic repair of any vendor change | bounded recovery for *known* failure shapes, then human escalation |
 | Guaranteed correct model selection | explainable routing evaluated against measured outcomes |

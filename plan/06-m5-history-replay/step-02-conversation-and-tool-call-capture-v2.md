@@ -4,7 +4,7 @@
 |---|---|
 | Milestone | M5 — History, recording, replay |
 | Status | ⬜ Not started |
-| Depends on | M1-08 (telemetry plane & fixture recorder), M1-05/M1-06/M1-07 (adapters), M5-01 (`packages/core/src/redaction`) |
+| Depends on | M1-08, M1-05, M1-06, M5-01 |
 | Estimated effort | 2.5 days |
 | Packages touched | `packages/core`, `packages/sdk`, `packages/providers/claude`, `packages/providers/codex`, `packages/providers/agy`, `apps/daemon` (`src/application/history`, `src/infrastructure/session-log`, `src/interface/http`), `apps/cli`, `apps/web` |
 | Risk | Medium |

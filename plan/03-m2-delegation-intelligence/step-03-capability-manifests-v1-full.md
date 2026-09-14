@@ -4,7 +4,7 @@
 |---|---|
 | Milestone | M2 — Delegation & intelligence |
 | Status | ⬜ Not started |
-| Depends on | M1-05, M1-06 (∥ with M2-01/M2-02); M1-07 only if the optional agy adapter is enabled |
+| Depends on | M1-05, M1-06 |
 | Estimated effort | 2.5 days |
 | Packages touched | `packages/sdk`, `packages/providers/claude`, `packages/providers/codex`, `packages/providers/agy`, `apps/daemon` |
 | Risk | Medium |

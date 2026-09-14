@@ -4,7 +4,7 @@
 |---|---|
 | Milestone | M5 — History, recording, replay |
 | Status | ⬜ Not started |
-| Depends on | M5-01 (pane recorder), M5-03 (FTS5 search), M5-02 (conversations), M1-03 (worktree manager), M0-07 (web shell) |
+| Depends on | M5-01, M5-02, M5-03, M1-03, M0-07 |
 | Estimated effort | 3 days |
 | Packages touched | `packages/core`, `apps/daemon` (`src/application/history`, `src/infrastructure/recorder`, `src/infrastructure/git`, `src/interface/http`), `apps/web`, `packages/ui` |
 | Risk | Medium |
@@ -197,7 +197,7 @@ Timeline replay includes captured terminal/events and commit-based diffs. Resolv
 - asciinema-player API surface for programmatic `seek`, `play`, speed and marker rendering, and whether it accepts a streamed (chunked) source rather than a complete file (verify against asciinema-player docs for the pinned version at step start). Fallback: serve the merged cast as a complete response with `Content-Length` and load per-segment on seek.
 - asciicast v2 `"m"` marker support in the player (same verification as M5-01 risk); if markers are unsupported, gaps render only in the scrubber lane, not inside the player.
 - Merged-stream `Range` support: re-timing makes byte offsets unstable if a segment is appended while streaming. Running sessions therefore disable ranges (`Accept-Ranges: none`) and re-fetch on seek; stopped sessions get a stable ETag.
-- Commit timestamps are *committer* dates and can lag the agent's action (rebase, amend, squash). The diff pane labels the commit time and offers "diff of working tree at t" as an explicit alternative only when the worktree still exists — never inferred silently.
+- Commit timestamps are *committer* dates and can lag the agent's action (rebase, amend, squash). The diff pane labels the commit time and offers "diff of recorded snapshot at t" only when an explicit checkpoint and content hash exist — never inferred silently.
 - A session whose worktree is shared with a later task (M3) could show commits from another agent; the indexer filters by the session's own branch and time range, but overlapping branches remain an open question to re-check after M3-07.
 - Very large diffs (generated code, lockfiles) can dominate the response; `maxBytes` + per-file truncation is a blunt instrument. Consider a "load full file diff" action in Review (M3-05) rather than here.
 - Client-side highlighting uses binary search over ts-ordered arrays; if M5-02 ever delivers out-of-order messages the highlight can jitter — ingest guarantees `seq` ordering, and a UT asserts monotonic ts within a conversation.

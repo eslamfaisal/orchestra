@@ -4,7 +4,7 @@
 |---|---|
 | Milestone | M5 — History, recording, replay |
 | Status | ⬜ Not started |
-| Depends on | M5-02 (conversations v2), M0-05 (event store), M0-07 (web shell) |
+| Depends on | M5-02, M0-05, M0-07 |
 | Estimated effort | 1.5 days |
 | Packages touched | `packages/core`, `apps/daemon` (`src/application/history`, `src/infrastructure/db/migrations`, `src/infrastructure/search`, `src/interface/http`), `apps/web`, `packages/ui` |
 | Risk | Low |

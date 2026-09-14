@@ -4,7 +4,7 @@
 |---|---|
 | Folder | `plan/03-m2-delegation-intelligence/` |
 | Steps | 9 (M2-01 … M2-09) |
-| Effort | ~20 working days |
+| Effort | 20 working days (sum of step estimates; optional work included) |
 | Entry gate | M1-13 ✅ (MVP tag) — see "Entry criteria" for the two steps that may start earlier |
 | Feature flags | `features.intelligence`, `features.mcpDelegation`, `features.board`, `features.chat` (all default `false` until M2 acceptance) |
 
@@ -48,15 +48,15 @@ After M2 the platform stops being "terminals with a prompt inbox" and becomes an
 
 | ID | File | Title | Effort | Depends on |
 |---|---|---|---|---|
-| M2-01 | [step-01-task-taxonomy-catalog.md](step-01-task-taxonomy-catalog.md) | Task taxonomy catalog | 2 d | M1-13 |
-| M2-02 | [step-02-model-catalog-and-profiles-v1.md](step-02-model-catalog-and-profiles-v1.md) | Model catalog & profiles v1 | 2.5 d | M2-01 |
-| M2-03 | [step-03-capability-manifests-v1-full.md](step-03-capability-manifests-v1-full.md) | Capability manifests v1 (full) | 2.5 d | M1-05, M1-06 ∥ (M1-07 if enabled) |
-| M2-04 | [step-04-assignment-engine.md](step-04-assignment-engine.md) | Assignment engine | 3 d | M2-02, M2-03 |
-| M2-05 | [step-05-mcp-delegation-server.md](step-05-mcp-delegation-server.md) | MCP delegation server | 3 d | M2-04, M1-11 |
-| M2-06 | [step-06-quick-delegate-v2.md](step-06-quick-delegate-v2.md) | Quick Delegate v2 | 1.5 d | M2-04, M1-12 |
-| M2-07 | [step-07-board-kanban.md](step-07-board-kanban.md) | Board (kanban) | 2 d | M2-06 |
-| M2-08 | [step-08-chat-screen.md](step-08-chat-screen.md) | Chat screen | 2.5 d | M1-11 ∥ (M2-03 for full palette) |
-| M2-09 | [step-09-routing-policy-file-and-decision-log.md](step-09-routing-policy-file-and-decision-log.md) | Routing policy file & decision log | 1 d | M2-04 |
+| M2-01 | [step-01](step-01-task-taxonomy-catalog.md) | Task taxonomy catalog | 2 d | M1-13 |
+| M2-02 | [step-02](step-02-model-catalog-and-profiles-v1.md) | Model catalog & profiles v1 | 2.5 d | M2-01 |
+| M2-03 | [step-03](step-03-capability-manifests-v1-full.md) | Capability manifests v1 (full) | 2.5 d | M1-05, M1-06 |
+| M2-04 | [step-04](step-04-assignment-engine.md) | Assignment engine | 3 d | M2-02, M2-03 |
+| M2-05 | [step-05](step-05-mcp-delegation-server.md) | MCP delegation server | 3 d | M2-04, M1-11 |
+| M2-06 | [step-06](step-06-quick-delegate-v2.md) | Quick Delegate v2 | 1.5 d | M2-04, M1-12 |
+| M2-07 | [step-07](step-07-board-kanban.md) | Board (kanban) | 2 d | M2-06 |
+| M2-08 | [step-08](step-08-chat-screen.md) | Chat screen | 2.5 d | M1-11, M2-03 |
+| M2-09 | [step-09](step-09-routing-policy-file-and-decision-log.md) | Routing policy file & decision log | 1 d | M2-04 |
 
 ## What you can test after this milestone
 
@@ -109,3 +109,6 @@ Lane D (UI):                 M2-08 (after M1-11; palette upgraded when M2-03 lan
 
 - One engineer: A then B is the critical path (≈ 7.5 d to M2-04). Do M2-03 while M2-02's Models screen is being polished; do M2-08 while waiting on real-CLI manual tests of M2-05.
 - Shared files to watch for conflicts: `packages/core/src/intelligence/*` (M2-01, M2-02, M2-04), `apps/daemon/src/interface/http/routing.controller.ts` (M2-04, M2-06, M2-09), `apps/web/src/features/routing/*` (M2-06, M2-07, M2-09).
+
+## Revised release boundary (2026-09-15)
+Complete every required step above and its regression scenarios; optional gated steps do not block the milestone. [DEPENDENCIES.md](../DEPENDENCIES.md) gives the actual order. Capability-specific provider evidence, explicit recovery outcomes and commit-bound validation govern the exit criteria; no live result is implied by this plan update.

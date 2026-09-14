@@ -4,8 +4,8 @@
 |---|---|
 | Milestone | M7 — Everywhere |
 | Status | ⬜ Not started |
-| Depends on | M0-07 (web shell), M5-05 (restore + `sinceEventId` WS protocol), M1-11 (AgentPrompt, Attention queue), M0-04 (config, token auth), M7-04 in practice (a tunnel hostname to install from) |
-| Estimated effort | 3 days |
+| Depends on | M0-07, M5-05, M1-11, M0-04, M7-04 |
+| Estimated effort | 2.5 days |
 | Packages touched | `apps/web` (manifest, service worker, install prompt, offline queue, mobile layouts), `apps/daemon` (`src/application/push`, `src/infrastructure/push`, `src/interface/http/push`, migration `push_subscriptions`), `packages/core` (idempotent answer rules), `packages/sdk` (push DTOs), `packages/ui` (mobile card variants) |
 | Risk | High (iOS Web Push behaviour is the least stable surface in the milestone) |
 | Owner | |

@@ -4,7 +4,7 @@
 |---|---|
 | Milestone | M7 — Everywhere |
 | Status | ⬜ Not started |
-| Depends on | M0-04 (daemon skeleton, local token, audit interceptor), M0-06 (HTTP API + WS gateway), M0-08 (egress test, SECURITY.md) |
+| Depends on | M0-04, M0-06, M0-08 |
 | Estimated effort | 1.5 days |
 | Packages touched | `apps/daemon` (`src/interface/http/auth`, `src/application/auth`, `src/infrastructure/auth`, config schema), `apps/web` (sign-in / re-pair screen, Settings → Remote access), `apps/cli` (`orch token …`), `docs/deployment/remote-access.md`, `SECURITY.md` |
 | Risk | High (this is the step that can expose a machine that runs arbitrary code) |

@@ -5,7 +5,7 @@
 | Milestone | M4 — Quota, budgets, resilience |
 | Status | ⬜ Not started |
 | Depends on | M1-08, M2-03 |
-| Estimated effort | 3.5 days |
+| Estimated effort | 2.5 days |
 | Packages touched | `packages/core`, `packages/sdk`, `packages/providers/claude`, `packages/providers/codex`, `packages/providers/agy`, `apps/daemon` |
 | Risk | Medium |
 | Owner | |

@@ -4,7 +4,7 @@
 |---|---|
 | Milestone | M2 — Delegation & intelligence |
 | Status | ⬜ Not started |
-| Depends on | M1-11 (∥ with M2-04..07; full `/` palette needs M2-03) |
+| Depends on | M1-11, M2-03 |
 | Estimated effort | 2.5 days |
 | Packages touched | `apps/web`, `packages/ui`, `apps/daemon`, `packages/core` |
 | Risk | Medium |
@@ -84,7 +84,7 @@ export interface CommandPaletteProps {                     // cmdk, opened by '/
 Tables `conversations`, `messages`, `message_tool_calls` exist in `04 §4`. Migration `m2_08_conversation_projection` adds: `messages.partial INTEGER NOT NULL DEFAULT 0`, `messages.notice_json TEXT NULL`, `messages.seq INTEGER NOT NULL` (ingestion sequence for stable ordering), unique index `(conversation_id, external_id)`, index `(conversation_id, ts, seq)`; `message_tool_calls.status TEXT NOT NULL DEFAULT 'ok'`. No new event types — the projector consumes the existing `session.*` / normalized telemetry stream and publishes UI deltas on `conversation:<sessionId>`; `session.commands_discovered` (M2-03) is consumed to refresh the palette.
 
 ### 4.4 Infrastructure (tmux, git, fs, network, external processes)
-- The projector subscribes to the M1-08 telemetry pipeline in-process (event bus, M0-05); it never reads PTY bytes and never spawns anything. Ingestion stays idempotent by `(source.channel, source.externalId)` as the event store already requires.
+- The projector subscribes to the M1-08 telemetry pipeline in-process (event bus, M0-05); it never reads PTY bytes and never spawns anything. Ingestion stays idempotent by `(providerId, sessionId, sourceGeneration, source.channel, source.externalId)` as the event store already requires.
 - Command sending goes through the adapter's `PaneController.sendCommand` (M1-05..07): `transport: 'rpc'` → app-server call, `'slash'`/`'keys'` → keystrokes to the tmux pane through the `SessionSupervisor` actor (D13). Chat never talks to tmux directly and never sends raw keystrokes for a *prompt answer* — prompts use their declared `answerTransport` (D14).
 - Backfill on open: if a session has fewer projected messages than events (e.g. the projector was added after the session started), `GetConversation` triggers a bounded replay of that session's stored events (max 5 000) before answering; anything beyond that is left to M5-02.
 

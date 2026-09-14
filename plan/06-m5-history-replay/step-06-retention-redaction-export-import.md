@@ -4,7 +4,7 @@
 |---|---|
 | Milestone | M5 — History, recording, replay |
 | Status | ⬜ Not started |
-| Depends on | M5-04 (Timeline & Replay UI), M5-01 (recorder + redactor), M5-02 (conversations), M5-03 (FTS5), M0-04 (audit interceptor) |
+| Depends on | M5-04, M5-01, M5-02, M5-03, M0-04 |
 | Estimated effort | 2 days |
 | Packages touched | `packages/core`, `apps/daemon` (`src/application/history`, `src/infrastructure/recorder`, `src/infrastructure/bundle`, `src/interface/http`), `apps/cli`, `apps/web`, `packages/ui` |
 | Risk | Medium |

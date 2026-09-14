@@ -4,7 +4,7 @@
 |---|---|
 | Milestone | M8 — Customization & skills |
 | Status | ⬜ Not started |
-| Depends on | M3-04, M4-01 |
+| Depends on | M3-04, M4-01, M8-01, M8-05 |
 | Estimated effort | 2.5 days |
 | Packages touched | `packages/core`, `packages/catalog`, `apps/daemon`, `apps/web`, `packages/ui`, `apps/cli` |
 | Risk | High |

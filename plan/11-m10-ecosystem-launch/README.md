@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Steps | 8 (M10-01 … M10-08) |
-| Effort | ~20 days |
+| Effort | 20 working days (sum of step estimates; optional work included) |
 | Status | ⬜ |
 | Entry | M6 complete (Doctor, drift, manifest registry, ladder 1–2, Health) and M9 complete (RBAC, audit, Postgres/Helm); M7-02 signed/notarized app shipping; M8-04 skills artifact format live |
 | Exit | a third party ships a provider plugin without a core PR; the Repair Agent closes an injected drift with a passing contract suite; docs site live in EN + AR; 1.0 tagged with signed artifacts, provenance, SBOM, Scorecard ≥ 7 and every 1.0 DoD line evidenced |
@@ -36,7 +36,7 @@ Each line is a row in the M10-08 audit table and must carry evidence (test ID, T
 - [ ] **DoD-4 Interaction Bridge** answers permission / question / planApproval prompts from web **and** PWA on every shipped provider through that provider's declared `answerTransport`. Evidence: per-provider TC IDs + M7-03 push TC.
 - [ ] **DoD-5 Doctor + ladder 1–2 live** with SLOs met: time-to-detect < 60 s, safe remediation < 10 s, measured on injected drift. Evidence: M6-07 SLO panel screenshot + M6-04 timing TC.
 - [ ] **DoD-6 Desktop app** signed, notarized, updater verified before delete, staged rollout, OS-floor check, memory/fps budgets met. Evidence: M7-02 TCs.
-- [ ] **DoD-7 Restore with zero lost prompts** across `kill -9` of the daemon mid-prompt. Evidence: M5-05 TC.
+- [ ] **DoD-7 Restore with durable captured prompts with explicit recovery outcomes** across `kill -9` of the daemon mid-prompt. Evidence: M5-05 TC.
 - [ ] **DoD-8 Forecasting on all providers**, every number labelled *official* or *estimate* with confidence. Evidence: M4-07 screenshot per provider.
 - [ ] **DoD-9 Supply chain**: OpenSSF Best Practices badge *passing*, Scorecard ≥ 7 in CI, npm provenance on every published package, Sigstore-signed release artifacts, SLSA provenance, CycloneDX SBOM attached to the release, `SECURITY.md` with a report channel and SLA. Evidence: badge URL, Scorecard job output, release assets.
 - [ ] **DoD-10 Docs** published with ADRs, Plugin Author Guide, Skill/Playbook Author Guide, deployment guide and a security/compliance page. Evidence: docs site URLs.
@@ -49,14 +49,14 @@ Each line is a row in the M10-08 audit table and must carry evidence (test ID, T
 ## Steps
 | ID | File | Title | Effort | Depends |
 |---|---|---|---|---|
-| M10-01 | [step-01](step-01-repair-agent-ladder-3.md) | Repair Agent (ladder 3) | 4 d | M6-04, M3-04 |
-| M10-02 | [step-02](step-02-community-drift-loop.md) | Community drift loop | 2 d | M6-02 (uses M10-03 endpoint) |
-| M10-03 | [step-03](step-03-plugin-skill-playbook-registry.md) | Plugin / skill / playbook registry | 3 d | M6-03, M8-04 |
-| M10-04 | [step-04](step-04-kimi-adapter.md) | Kimi adapter | 2.5 d | M2-03 |
-| M10-05 | [step-05](step-05-opencode-adapter.md) | OpenCode adapter | 2.5 d | M2-03 |
-| M10-06 | [step-06](step-06-docs-site.md) | Docs site | 2.5 d | M10-03 |
-| M10-07 | [step-07](step-07-governance-and-releases.md) | Governance & releases | 2 d | — (finishes M0-08) |
-| M10-08 | [step-08](step-08-1-0-definition-of-done-audit.md) | 1.0 Definition of Done audit | 1.5 d | all |
+| M10-01 | [step-01](step-01-repair-agent-ladder-3.md) | Repair Agent (ladder 3) | 4 d | M6-04, M3-04, M3-06, M1-12, M6-03 |
+| M10-02 | [step-02](step-02-community-drift-loop.md) | Community drift loop | 2 d | M6-02, M6-03, M10-03, M8-01, M8-08 |
+| M10-03 | [step-03](step-03-plugin-skill-playbook-registry.md) | Plugin / skill / playbook registry | 3 d | M6-03, M8-04, M8-01, M2-01, M2-02, M3-01 |
+| M10-04 | [step-04](step-04-kimi-adapter.md) | Kimi adapter | 2.5 d | M2-03, M1-02, M1-04, M1-08, M1-11, M4-01, M8-04 |
+| M10-05 | [step-05](step-05-opencode-adapter.md) | OpenCode adapter | 2.5 d | M2-03, M1-02, M1-04, M1-08, M1-11, M2-02, M4-01, M8-01 |
+| M10-06 | [step-06](step-06-docs-site.md) | Docs site | 2.5 d | M10-03, M0-03, M8-04, M3-01, M9-06, M7-01, M7-02, M10-07 |
+| M10-07 | [step-07](step-07-governance-and-releases.md) | Governance & releases | 2 d | M0-08, M7-02 |
+| M10-08 | [step-08](step-08-1-0-definition-of-done-audit.md) | 1.0 Definition of Done audit | 1.5 d | M0-01, M0-02, M0-03, M0-04, M0-05, M0-06, M0-07, M0-08, M0-09, M1-01, M1-02, M1-03, M1-04, M1-05, M1-06, M1-08, M1-09, M1-10, M1-11, M1-12, M1-13, M2-01, M2-02, M2-03, M2-04, M2-05, M2-06, M2-07, M2-08, M2-09, M3-01, M3-02, M3-03, M3-04, M3-05, M3-06, M3-07, M3-08, M3-09, M4-01, M4-02, M4-03, M4-04, M4-05, M4-06, M4-07, M5-01, M5-02, M5-03, M5-04, M5-05, M5-06, M6-01, M6-02, M6-03, M6-04, M6-05, M6-06, M6-07, M7-01, M7-02, M7-03, M7-04, M7-05, M7-06, M8-01, M8-02, M8-03, M8-04, M8-05, M8-06, M8-07, M8-08, M9-01, M9-02, M9-03, M9-04, M9-05, M9-06, M9-07, M9-08, M9-09, M10-01, M10-02, M10-03, M10-04, M10-05, M10-06, M10-07 |
 
 ## What you can test after this milestone
 - Inject a fixture drift for a provider, watch Doctor classify it, ladder 1–2 fail, then hand it to the Repair Agent and receive a patch whose contract suite is green — and open a PR from the Health screen.
@@ -94,3 +94,6 @@ Each line is a row in the M10-08 audit table and must carry evidence (test ID, T
 
 ## Parallelization
 M10-07 depends on nothing and should start first — ADR-001 and ADR-002 gate names and URLs used everywhere else. M10-03 is the spine: M10-02's upload endpoint and M10-06's guides both consume it, so build it early in the milestone. M10-04 and M10-05 depend only on M2-03 and can run fully in parallel with M10-01/02/03 (they touch only `packages/providers/kimi|opencode`). M10-06 needs M10-03's manifest/plugin formats frozen, but its getting-started, concepts, ADR and deployment sections can be written in parallel from day one. M10-08 is last by construction and is audit + launch only — if it finds a gap, that gap becomes a new step in `ROADMAP.md`, never a silent expansion of M10-08.
+
+## Revised release boundary (2026-09-15)
+Complete every required step above and its regression scenarios; optional gated steps do not block the milestone. [DEPENDENCIES.md](../DEPENDENCIES.md) gives the actual order. Capability-specific provider evidence, explicit recovery outcomes and commit-bound validation govern the exit criteria; no live result is implied by this plan update.

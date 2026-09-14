@@ -4,7 +4,7 @@
 |---|---|
 | Milestone | M1 — MVP: Live fleet |
 | Status | ⬜ Not started |
-| Depends on | M1-04, M0-07 (∥) |
+| Depends on | M1-04, M0-07 |
 | Estimated effort | 2 days |
 | Packages touched | `apps/web` (fleet), `apps/daemon` (sessions DTO extensions) |
 | Risk | Low |

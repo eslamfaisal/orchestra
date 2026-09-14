@@ -4,7 +4,7 @@
 |---|---|
 | Milestone | M10 — Ecosystem & 1.0 |
 | Status | ⬜ Not started |
-| Depends on | M2-03 (full capability manifests incl. command discovery + prompt protocol); uses M1-02 (SessionSupervisor), M1-04 (BinaryRegistry), M1-08 (telemetry plane + fixture recorder), M1-11 (Interaction Bridge), M4-01 (quota windows), M8-04 (skills installer) |
+| Depends on | M2-03, M1-02, M1-04, M1-08, M1-11, M4-01, M8-04 |
 | Estimated effort | 2.5 days |
 | Packages touched | `packages/providers/kimi`, `packages/sdk` (ACP transport helper), `apps/daemon/src/infrastructure/binaries`, `packages/catalog/models/kimi`, `apps/web` (Fleet copy) |
 | Risk | Medium (R1; new vendor surface, but the SDK and three adapters already exist) |
@@ -68,28 +68,7 @@ export interface AcpClient {
 // which the Doctor counts as a drift signal (M6-02, SignalKind 'parse_error') — never a throw, never a guess.
 ```
 Manifest excerpt (shapes are fixed by the SDK schema; every *value* marked "(verify)" is confirmed against the Kimi Code docs and the recorded CLI at step start):
-```jsonc
-{
-  "provider": "kimi",
-  "manifestVersion": "1.0.0",
-  "cliVersionRange": ">=<recorded major.minor> <next major>",   // filled from the recorded CLI (verify)
-  "fixturesVersion": "<cliVersion>",
-  "models": [ /* ids exactly as the CLI lists them (verify) */ ],
-  "limits": { "maxConcurrentSessions": 2, "windows": ["daily"], "resume": true, "fork": false },   // (verify)
-  "features": ["hooks", "mcp", "skills", "acp", "streamJsonInput"],                                 // (verify)
-  "sandboxProfiles": [ /* Kimi's own permission/approval modes (verify) */ ],
-  "commands": [ /* native slash commands + discovered workspace commands (verify) */ ],
-  "promptProtocol": {
-    "permission":   { "source": "hook:<PreToolUse-equivalent>", "answerTransport": "hook-response", "fallback": "send-keys-acked", "deadlineMs": 60000 },
-    "question":     { "source": "acp:<request method>",          "answerTransport": "acp-response",  "fallback": "send-keys-acked" },
-    "planApproval": { "source": "hook:<plan-exit equivalent>",   "answerTransport": "hook-response", "fallback": "send-keys-acked" },
-    "login":        { "source": "process:stderr",                "answerTransport": "none" }
-  },
-  "headless": { "flags": ["<documented headless flag>"], "outputFormat": "stream-json" },           // (verify)
-  "paths": { "instructionFile": "<AGENTS.md or Kimi equivalent>", "skillsDir": "<...>", "commandsDir": "<...>", "hooksConfig": "<...>", "mcpConfig": "<...>" },  // (verify)
-  "updateSources": { "releases": "<GitHub releases URL>", "changelog": "<...>", "docs": "<...>" }
-}
-```
+No illustrative hook/permission manifest is normative. Populate the SDK capability schema from the chosen version-pinned protocol, with every operation initially `unverified`; disable unsupported operations.
 ### 4.3 Data / schema changes
 None. Sessions, events, `agent_prompts`, `provider_windows` and `outcomes` already carry `providerId`; `kimi` is added to the `ProviderId` union in `packages/sdk` (a type-level change already anticipated by `05-provider-contract.md` §1) and to `packages/catalog/models/kimi/*.yaml`.
 
@@ -127,6 +106,9 @@ rate limit
   stream/stderr/exit fixture → KimiRateLimitParser → RateLimitSignal{windowKind, resetAt|retryAfterMs, confidence}
     → M4-01 window → M4-03 cooling + reroute
 ```
+
+### 4.7 Review reconciliation contract (2026-09-15)
+Assess the official Wire protocol and ACP first. Select a version-pinned execution mode using experiments before writing launcher/controller methods. An independent TUI is not assumed to provide a structured side channel. Hooks, model switching, quotas and skills installation remain disabled unless specifically evidenced. Record provider/version/mode/backend identity, source retrieval date, fixtures, limitations and acceptance outcomes in foundation 14. Contract success never establishes live vendor compatibility.
 
 ## 5. Tasks
 - [ ] Verify the Kimi Code surface against its docs and the installed CLI: hook names + payloads, ACP availability and method names, headless flags, skills/plugins directory and trust levels, session-log location, `--version` output, any quota/status command. Record findings in `README.md` and in the step log before writing code.
@@ -181,7 +163,13 @@ rate limit
 | TC-M10-04-11 | Cross-vendor review | 1. Run a small mission where Kimi implements and another vendor reviews. | Assignment engine picks a reviewer whose provider ≠ kimi; findings route back to the Kimi session; round completes | ⬜ |
 | TC-M10-04-12 | Fixtures are the truth | 1. `pnpm --filter ./packages/providers/kimi test`. 2. Upgrade the CLI to the next release and re-run. | Contract suite green on the pinned fixtures; after the upgrade, any failure is a drift signal and produces a RepairCase rather than a silent pass | ⬜ |
 
+### 6.3 Review regression scenarios
+- [ ] An unsupported prompt kind disables only that feature.
+- [ ] Real protocol fixtures drive positive/negative permission tests.
+- [ ] Backend/model change cannot inherit an unverified capability.
+
 ## 7. Acceptance criteria (Definition of Done)
+- [ ] The review reconciliation contract and all §6.3 regression scenarios pass; archive evidence alongside the original test cases.
 - [ ] All seven contract specs green on fixtures recorded from a real Kimi Code install; `RECORDED.md` states the CLI version, date, scenario and redaction applied.
 - [ ] Permission, question and plan prompts round-trip on a real session from web **and** PWA through the declared transports, with the fallback proven (TC-03, TC-04, TC-05).
 - [ ] Rate-limit parsing yields a usable window with an explicit *official* / *estimate* label (TC-07).

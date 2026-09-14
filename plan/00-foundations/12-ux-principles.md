@@ -38,4 +38,7 @@ Dark-first · semantic status tokens (`status-running`, `status-waiting`, `statu
 | Input echo | ≤ 50 ms local |
 | Notifications | coalesced, deep-linked |
 | Offline | history readable; answers queued and delivered on reconnect |
-| Restore | re-attach tmux + replay events; zero lost prompts |
+| Restore | re-attach tmux + replay events; durable captured prompts with explicit recovery outcomes |
+
+## Feasibility contract reconciliation (2026-09-15)
+Provider capabilities are keyed by exact CLI version and execution mode; foundation 14 and M0-09 define the release gate. Mandatory unsupported capabilities block that mode; optional unsupported capabilities disable only the feature. Task success follows declared deliverables (M3-03), independent review uses model publisher identity (M3-04), and merge validation binds the exact candidate commit (M3-05). Recovery means durable captured records with explicit outcomes (M5-05), not universal capture or exactly-once effects. Budgets are admission limits (ADR-021). Learning defaults to shadow proposals (M8-06). Enterprise v1 is trusted shared-team execution (ADR-019); plugin provenance alone never authorizes untrusted execution (ADR-014). These revised contracts govern implementation; the source-plan-v0.2 snapshot is historical.

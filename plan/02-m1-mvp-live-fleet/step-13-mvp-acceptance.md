@@ -4,7 +4,7 @@
 |---|---|
 | Milestone | M1 — MVP: Live fleet |
 | Status | ⬜ Not started |
-| Depends on | M1-01 … M1-12 |
+| Depends on | M1-01, M1-02, M1-03, M1-04, M1-05, M1-06, M1-08, M1-09, M1-10, M1-11, M1-12 |
 | Estimated effort | 2 days |
 | Packages touched | `plan/02-m1-mvp-live-fleet/evidence/`, repo tag, `PROGRESS.md`, `ENVIRONMENT.md` |
 | Risk | Low (gate) |

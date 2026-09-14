@@ -5,7 +5,7 @@
 | Milestone | M2 — Delegation & intelligence |
 | Status | ⬜ Not started |
 | Depends on | M2-04 |
-| Estimated effort | 1 day |
+| Estimated effort | 1 days |
 | Packages touched | `packages/core`, `packages/catalog`, `apps/daemon`, `apps/web`, `apps/cli` |
 | Risk | Low |
 | Owner | |

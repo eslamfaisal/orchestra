@@ -4,7 +4,7 @@
 |---|---|
 | Milestone | M0 — Foundation |
 | Status | ⬜ Not started |
-| Depends on | M0-06 (can start against WS schema from M0-06 §4.2 in parallel with M0-04/05) |
+| Depends on | M0-06 |
 | Estimated effort | 2.5 days |
 | Packages touched | `apps/web`, `packages/ui` |
 | Risk | Medium |

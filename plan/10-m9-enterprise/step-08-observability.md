@@ -4,7 +4,7 @@
 |---|---|
 | Milestone | M9 — Enterprise |
 | Status | ⬜ Not started |
-| Depends on | M0-04 |
+| Depends on | M0-04, M9-03 |
 | Estimated effort | 2 days |
 | Packages touched | `apps/daemon` (`src/infrastructure/telemetry/{otel,metrics}`, `src/infrastructure/egress`, `src/interface/http/metrics`, `src/interface/config`), `packages/core` (metric name constants only), `deploy/grafana` (new), `deploy/helm/orchestra` (ServiceMonitor, OTLP values), `docs/deployment` |
 | Risk | Medium (a metrics endpoint is an information-disclosure surface; cardinality bugs can OOM a scrape target) |

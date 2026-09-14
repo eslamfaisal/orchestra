@@ -1,47 +1,117 @@
-// Verifies plan structure: run from plan/ or repo root:  node plan/tools/verify-plan.mjs
-// Checks: every ROADMAP step has a template-conformant file, PROGRESS/AGENT_ROUTING rows exist,
-// dependencies reference existing earlier steps (no forward/self references), and gated steps are not depended on.
-import fs from 'node:fs'; import path from 'node:path';
+// Read-only by default. --write-graph explicitly refreshes DEPENDENCIES.md.
+import fs from 'node:fs';
+import path from 'node:path';
+
 const root = fs.existsSync('ROADMAP.md') ? '.' : 'plan';
-const read = f => fs.readFileSync(path.join(root,f),'utf8');
-const md = read('ROADMAP.md').split('\n');
-const slug = t => t.toLowerCase().replace(/&/g,'and').replace(/[()]/g,'').replace(/[^a-z0-9 ]+/g,' ').trim().replace(/\s+/g,'-');
-const ms=[]; let cur=null;
-for (const line of md){ const h=line.match(/^### (M\d+) — (.+?) \(`(.+?)`\)/); if(h){cur={id:h[1],folder:h[2]&&h[3].replace(/\/$/,''),steps:[]};ms.push(cur);continue;}
-  const r=cur&&line.match(/^\| (M\d+-\d\d) \| (.+?) \| ([\d.]+) \| (.+?) \| (.+?) \|$/); if(r) cur.steps.push({id:r[1],title:r[2],effort:Number(r[3]),depends:r[4],scope:r[5],file:`step-${r[1].split('-')[1]}-${slug(r[2])}.md`}); }
-const headings=['## 1. Goal','## 2. Why','## 3. Scope','## 4. Design','## 5. Tasks','## 6. Tests','## 7. Acceptance criteria','## 8. Risks / open questions','## 9. Notes & progress log'];
-let problems=0, files=0, lines=0;
-const report=(f,msg)=>{problems++; console.log(`  ✗ ${f}: ${msg}`);};
-const order=new Map(); let n=0; for(const m of ms) for(const s of m.steps) order.set(s.id,n++);
-const gated=new Set(); for(const m of ms) for(const s of m.steps) if(/\*\*gated\*\*/i.test(s.scope)) gated.add(s.id);
-const progress=read('PROGRESS.md'), routing=fs.existsSync(path.join(root,'AGENT_ROUTING.md'))?read('AGENT_ROUTING.md'):'';
-for (const m of ms){ const dir=path.join(root,m.folder); const readme=path.join(dir,'README.md');
-  if(!fs.existsSync(readme)) report(m.folder+'/README.md','missing');
-  for (const s of m.steps){ const f=path.join(dir,s.file);
-    // dependency graph
-    const deps=(s.depends.match(/M\d+-\d\d/g)||[]);
-    const ranges=(s.depends.match(/(M\d+)-(\d\d)\.\.(\d\d)/g)||[]);
-    for(const rg of ranges){ const [,m1,a,b]=rg.match(/(M\d+)-(\d\d)\.\.(\d\d)/); for(let i=Number(a);i<=Number(b);i++) deps.push(`${m1}-${String(i).padStart(2,'0')}`); }
-    for(const d of new Set(deps)){
-      if(!order.has(d)) report(`ROADMAP ${s.id}`,`depends on unknown step ${d}`);
-      else if(d===s.id) report(`ROADMAP ${s.id}`,'depends on itself');
-      else if(order.get(d)>order.get(s.id) && !new RegExp(`after\\s+${d}`).test(s.depends)) report(`ROADMAP ${s.id}`,`depends on later step ${d} (order inconsistent; write "after ${d}" if intended)`);
-      if(gated.has(d)) report(`ROADMAP ${s.id}`,`depends on gated step ${d}`);
+const read = file => fs.readFileSync(path.join(root, file), 'utf8');
+const issues = [];
+const report = (file, reason) => issues.push(`${file}: ${reason}`);
+const rows = new Map();
+const milestones = [];
+let milestone;
+for (const line of read('ROADMAP.md').split('\n')) {
+  const heading = line.match(/^### (M\d+) — .*?\(`([^`]+)`\)/);
+  if (heading) {
+    milestone = { id: heading[1], folder: heading[2].replace(/\/$/, ''), steps: [] };
+    milestones.push(milestone);
+  }
+  const row = line.match(/^\| (M\d+-\d\d) \| (.*?) \| ([\d.]+) \| (.*?) \| (.*?) \|$/);
+  if (!row) continue;
+  if (!milestone || !row[1].startsWith(`${milestone.id}-`)) {
+    report('ROADMAP.md', `misplaced step ${row[1]}`); continue;
+  }
+  if (rows.has(row[1])) report('ROADMAP.md', `duplicate step ${row[1]}`);
+  const dependencyText = row[4];
+  if (dependencyText !== '—' && !/^M\d+-\d\d(?:, M\d+-\d\d)*$/.test(dependencyText)) {
+    report(row[1], 'dependencies must be explicit IDs separated by comma-space; no ranges/all/parallel prose');
+  }
+  const dependencies = dependencyText === '—' ? [] : dependencyText.split(', ');
+  if (new Set(dependencies).size !== dependencies.length) report(row[1], 'duplicate dependency');
+  const record = { id: row[1], title: row[2], effort: Number(row[3]), dependencies,
+    optional: /\*\*gated\*\*/i.test(row[5]), milestone };
+  rows.set(record.id, record); milestone.steps.push(record);
+}
+if (!rows.size) report('ROADMAP.md', 'no steps parsed');
+const sections = ['Goal','Why','Scope','Design','Tasks','Tests','Acceptance criteria','Risks / open questions','Notes & progress log'];
+const progress = read('PROGRESS.md');
+const routing = read('AGENT_ROUTING.md');
+const numericSum = records => records.reduce((sum, record) => sum + record.effort, 0);
+let files = 0;
+for (const m of milestones) {
+  const folder = path.join(root, m.folder);
+  const names = fs.existsSync(folder) ? fs.readdirSync(folder).filter(name => /^step-.*\.md$/.test(name)) : [];
+  if (names.length !== m.steps.length) report(m.folder, 'step file count differs from roadmap');
+  const readmeFile = `${m.folder}/README.md`;
+  if (!fs.existsSync(path.join(root, readmeFile))) { report(readmeFile, 'missing'); continue; }
+  const readme = read(readmeFile);
+  const count = readme.match(/^\| Steps \| (\d+)/m);
+  if (!count || Number(count[1]) !== m.steps.length) report(readmeFile, 'step count mismatch');
+  const effort = readme.match(/^\| Effort \| ([\d.]+)/m);
+  if (!effort || Number(effort[1]) !== numericSum(m.steps)) report(readmeFile, 'effort sum mismatch');
+  for (const s of m.steps) {
+    const matches = names.filter(name => fs.readFileSync(path.join(folder, name), 'utf8').startsWith(`# Step ${s.id} — `));
+    if (matches.length !== 1) { report(s.id, `expected one matching file, found ${matches.length}`); continue; }
+    s.file = `${m.folder}/${matches[0]}`;
+    const text = read(s.file); files++;
+    for (const [index, section] of sections.entries()) {
+      if (!text.includes(`## ${index + 1}. ${section}`)) report(s.file, `missing section ${section}`);
     }
-    if(!progress.includes(`| ${s.id} |`)) report('PROGRESS.md',`no row for ${s.id}`);
-    if(routing && !routing.includes(`| ${s.id} |`)) report('AGENT_ROUTING.md',`no row for ${s.id}`);
-    if(!fs.existsSync(f)){report(f,'missing');continue;}
-    const txt=fs.readFileSync(f,'utf8'); files++; lines+=txt.split('\n').length;
-    for(const h of headings) if(!txt.includes(h)) report(f,`missing heading "${h}"`);
-    if(!/\| Status \| [⬜🟨🧪✅⛔⏸]/.test(txt)) report(f,'no status line');
-    const tcs=(txt.match(/\| TC-M\d+-\d\d-\d\d \|/g)||[]).length; if(tcs<5) report(f,`only ${tcs} manual test cases`);
-    if(/<X>|<NN>|<Title>|<milestone name>/.test(txt)) report(f,'template placeholder left');
-    if(!txt.includes(`# Step ${s.id}`)) report(f,`title does not start with "# Step ${s.id}"`);
-    // gated steps must not be required by milestone READMEs / acceptance text of other steps
-  } }
-// milestone READMEs must not require gated steps as entry conditions
-for (const m of ms){ const readme=path.join(root,m.folder,'README.md'); if(!fs.existsSync(readme)) continue; const t=fs.readFileSync(readme,'utf8');
-  for(const g of gated){ if(m.steps.some(s=>s.id===g)) continue; const re=new RegExp(`${g}[^|\\n]*✅`); if(re.test(t)) report(readme,`entry condition requires gated step ${g}`); } }
-const total=ms.reduce((a,m)=>a+m.steps.reduce((b,s)=>b+s.effort,0),0);
-console.log(`checked ${files} step files (${lines} lines) across ${ms.length} milestones, ${order.size} steps, ${total} d of estimates, gated: ${[...gated].join(', ')||'none'}; ${problems} problem(s)`);
-process.exit(problems?1:0);
+    if (!text.startsWith(`# Step ${s.id} — ${s.title}\n`)) report(s.file, 'title differs from roadmap');
+    const headerDeps = text.match(/^\| Depends on \| (.*?) \|$/m)?.[1];
+    if (headerDeps !== (s.dependencies.join(', ') || '—')) report(s.file, 'dependencies differ from roadmap');
+    if (Number(text.match(/^\| Estimated effort \| ([\d.]+)/m)?.[1]) !== s.effort) report(s.file, 'effort differs from roadmap');
+    const status = text.match(/^\| Status \| (⬜|🟨|🧪|✅|⛔|⏸)/m)?.[1];
+    if (!status) report(s.file, 'missing status');
+    const testIds = [...text.matchAll(/^\| (TC-M\d+-\d\d-\d\d) \|/gm)].map(match => match[1]);
+    if (testIds.length < 5) report(s.file, 'fewer than five manual cases');
+    if (new Set(testIds).size !== testIds.length) report(s.file, 'duplicate manual test IDs');
+    if (testIds.some(id => !id.startsWith(`TC-${s.id}-`))) report(s.file, 'manual test ID belongs to another step');
+    if (/<X>|<NN>|<Title>|<milestone name>/.test(text)) report(s.file, 'template placeholder');
+    for (const [file, content] of [['PROGRESS.md', progress], ['AGENT_ROUTING.md', routing], [readmeFile, readme]]) {
+      const lines = content.split('\n').filter(line => line.startsWith(`| ${s.id} |`));
+      if (lines.length !== 1) report(file, `expected one row for ${s.id}`);
+      if (lines.length === 1 && !lines[0].includes(matches[0])) report(file, `missing/wrong file link for ${s.id}`);
+      if (file === 'PROGRESS.md' && lines.length === 1) {
+        const cells = lines[0].split('|').map(cell => cell.trim());
+        if (cells[5] !== status) report(file, `status mismatch for ${s.id}`);
+        if (Number(cells[4].replace(/ d$/, '')) !== s.effort) report(file, `effort mismatch for ${s.id}`);
+      }
+      if (file === readmeFile && lines.length === 1 && !lines[0].endsWith(`| ${headerDeps} |`)) report(file, `dependency mismatch for ${s.id}`);
+    }
+    for (const dep of s.dependencies) {
+      if (!rows.has(dep)) report(s.id, `unknown dependency ${dep}`);
+      else if (dep === s.id) report(s.id, 'self dependency');
+      else if (rows.get(dep).optional) report(s.id, `depends on optional gated step ${dep}`);
+    }
+  }
+}
+// Actual cycle detection permits legitimate forward-numbered prerequisites.
+const done = new Set();
+const active = [];
+const order = [];
+function visit(id) {
+  if (done.has(id) || !rows.has(id)) return;
+  if (active.includes(id)) { report('dependency graph', `cycle: ${[...active.slice(active.indexOf(id)), id].join(' → ')}`); return; }
+  active.push(id);
+  for (const dep of rows.get(id).dependencies) visit(dep);
+  active.pop(); done.add(id); order.push(id);
+}
+for (const id of rows.keys()) visit(id);
+const required = [...rows.values()].filter(s => !s.optional);
+const total = numericSum([...rows.values()]);
+const graph = [
+  '# Generated step dependency graph', '',
+  'Generated from ROADMAP.md by `node plan/tools/verify-plan.mjs --write-graph`. IDs are stable; prerequisites determine execution order. Optional gates also require their documented external decisions.', '',
+  `Steps: ${rows.size}; total effort: ${total} working days; required scope: ${numericSum(required)} working days. Estimates are not delivery forecasts.`, '',
+  '## Topological execution order', '',
+  '| Order | Step | Direct prerequisites | Effort | Release scope |', '|---|---|---|---|---|',
+  ...order.map((id, index) => { const s = rows.get(id); return `| ${index + 1} | [${id}: ${s.title}](${s.file}) | ${s.dependencies.join(', ') || '—'} | ${s.effort} d | ${s.optional ? 'Optional gated' : 'Required'} |`; }), '',
+  '## Complete graph', '', '```mermaid', 'flowchart TD',
+  ...[...rows.values()].map(s => `  ${s.id.replace('-', '_')}["${s.id}${s.optional ? ' optional' : ''}"]`),
+  ...[...rows.values()].flatMap(s => s.dependencies.map(dep => `  ${dep.replace('-', '_')} --> ${s.id.replace('-', '_')}`)), '```', '',
+].join('\n');
+if (!issues.length && process.argv.includes('--write-graph')) fs.writeFileSync(path.join(root, 'DEPENDENCIES.md'), graph);
+else if (!issues.length && (!fs.existsSync(path.join(root, 'DEPENDENCIES.md')) || read('DEPENDENCIES.md') !== graph)) report('DEPENDENCIES.md', 'missing or stale; run --write-graph');
+for (const issue of issues) console.error(`  ✗ ${issue}`);
+console.log(`Checked ${files} step files across ${milestones.length} milestones; ${total} d total, ${numericSum(required)} d required; ${issues.length} problem(s). Structural checks do not establish runtime feasibility.`);
+process.exitCode = issues.length ? 1 : 0;

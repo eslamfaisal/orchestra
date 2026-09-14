@@ -40,13 +40,13 @@ After M6 the platform maintains itself against vendor CLI churn (D6, G6). A Doct
 
 | ID | File | Title | Effort | Depends on |
 |---|---|---|---|---|
-| M6-01 | [step-01-doctor.md](step-01-doctor.md) | Doctor | 2.5 d | M1-04, M2-03 |
-| M6-02 | [step-02-drift-detector-and-classifier.md](step-02-drift-detector-and-classifier.md) | Drift detector & classifier | 2.5 d | M6-01, M4-01 |
-| M6-03 | [step-03-manifest-registry-client.md](step-03-manifest-registry-client.md) | Manifest registry client | 2 d | M2-03 |
-| M6-04 | [step-04-remediation-ladder-1-2.md](step-04-remediation-ladder-1-2.md) | Remediation ladder 1–2 | 3 d | M6-02, M6-03 |
-| M6-05 | [step-05-release-watchers-and-canary-lane.md](step-05-release-watchers-and-canary-lane.md) | Release watchers & canary lane | 2 d | M6-01 |
-| M6-06 | [step-06-model-lifecycle.md](step-06-model-lifecycle.md) | Model lifecycle | 1.5 d | M2-02, M6-03 |
-| M6-07 | [step-07-health-screen-and-slos.md](step-07-health-screen-and-slos.md) | Health screen & SLOs | 2 d | M6-04 |
+| M6-01 | [step-01](step-01-doctor.md) | Doctor | 2.5 d | M1-04, M2-03, M1-08 |
+| M6-02 | [step-02](step-02-drift-detector-and-classifier.md) | Drift detector & classifier | 2.5 d | M6-01, M4-01, M1-08, M0-05 |
+| M6-03 | [step-03](step-03-manifest-registry-client.md) | Manifest registry client | 2 d | M2-03, M0-04, M0-08 |
+| M6-04 | [step-04](step-04-remediation-ladder-1-2.md) | Remediation ladder 1–2 | 3 d | M6-02, M6-03, M4-03, M1-02, M5-05 |
+| M6-05 | [step-05](step-05-release-watchers-and-canary-lane.md) | Release watchers & canary lane | 2 d | M6-01, M6-03, M1-03, M1-11, M6-04 |
+| M6-06 | [step-06](step-06-model-lifecycle.md) | Model lifecycle | 1.5 d | M6-03, M2-02, M2-04, M2-09 |
+| M6-07 | [step-07](step-07-health-screen-and-slos.md) | Health screen & SLOs | 2 d | M6-04, M6-01, M6-02, M6-03, M6-05, M6-06, M0-07 |
 
 Total: 15.5 d (ROADMAP: ~16 d).
 
@@ -94,3 +94,6 @@ Preconditions: daemon running with `features.maintenance: true`, `maintenance.re
 - **Lane D (model lifecycle):** M6-06 depends on M2-02 + M6-03; can run in parallel with M6-04; its Attention/Models UI is small enough to finish before M6-07 wires the Health screen.
 - Shared touchpoints to coordinate: `repair_cases` migrations (M6-02 adds, M6-04 adds `repair_attempts`), the event catalog additions (`provider.manifest_reloaded`, `provider.manifest_rolled_back`, `provider.canary_completed`, `catalog.*`), and the `EgressPolicy` port (M6-03 introduces, M6-05 reuses). Land M6-03 first when in doubt.
 - All steps ship behind `features.maintenance`; the flag is removed in M6-07 acceptance.
+
+## Revised release boundary (2026-09-15)
+Complete every required step above and its regression scenarios; optional gated steps do not block the milestone. [DEPENDENCIES.md](../DEPENDENCIES.md) gives the actual order. Capability-specific provider evidence, explicit recovery outcomes and commit-bound validation govern the exit criteria; no live result is implied by this plan update.

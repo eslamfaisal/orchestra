@@ -4,7 +4,7 @@
 |---|---|
 | Milestone | M10 — Ecosystem & 1.0 |
 | Status | ⬜ Not started |
-| Depends on | M6-04 (remediation ladder 1–2), M3-04 (review rounds); uses M3-06 (PR via `gh`), M1-12 (task runner), M6-03 (manifest hot reload / rollback) |
+| Depends on | M6-04, M3-04, M3-06, M1-12, M6-03 |
 | Estimated effort | 4 days |
 | Packages touched | `packages/core`, `packages/sdk`, `apps/daemon`, `apps/web`, `apps/cli`, `tools/`, `CODEOWNERS` |
 | Risk | High |

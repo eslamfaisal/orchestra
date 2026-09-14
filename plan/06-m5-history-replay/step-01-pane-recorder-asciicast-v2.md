@@ -4,7 +4,7 @@
 |---|---|
 | Milestone | M5 — History, recording, replay |
 | Status | ⬜ Not started |
-| Depends on | M1-02 (PTY port & SessionSupervisor), M1-01 (tmux control-mode driver), M0-05 (event store) |
+| Depends on | M1-02, M1-01, M0-05 |
 | Estimated effort | 2.5 days |
 | Packages touched | `packages/core`, `apps/daemon` (`src/application`, `src/infrastructure/recorder`, `src/interface/http`), `apps/web`, `packages/sdk` (FakeProvider scenario) |
 | Risk | Medium |

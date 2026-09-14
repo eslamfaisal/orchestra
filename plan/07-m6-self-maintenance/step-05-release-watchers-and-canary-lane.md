@@ -4,7 +4,7 @@
 |---|---|
 | Milestone | M6 — Self-maintenance |
 | Status | ⬜ Not started |
-| Depends on | M6-01 (Doctor, probes, fixtures), M6-03 (`EgressPolicy`, manifest cache), M1-03 (worktrees), M1-11 (Attention queue) |
+| Depends on | M6-01, M6-03, M1-03, M1-11, M6-04 |
 | Estimated effort | 2 days |
 | Packages touched | `packages/core`, `packages/sdk`, `apps/daemon`, `apps/cli`, `apps/web`, `packages/providers/claude`, `packages/providers/codex`, `packages/providers/agy` |
 | Risk | Medium |

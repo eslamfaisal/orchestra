@@ -38,14 +38,14 @@ After M8 the intelligence layer is fully **data, not code** (D7): every knob tha
 
 | ID | Step | Title | Effort | Depends on |
 |---|---|---|---|---|
-| M8-01 | [step-01-layered-settings-engine.md](step-01-layered-settings-engine.md) | Layered settings engine | 2.5 d | M2-09 |
-| M8-02 | [step-02-policy-roles-task-type-editors.md](step-02-policy-roles-task-type-editors.md) | Policy, roles, task-type editors | 3 d | M8-01 |
-| M8-03 | [step-03-prompt-library.md](step-03-prompt-library.md) | Prompt library | 1.5 d | M8-01 |
-| M8-04 | [step-04-skills-system.md](step-04-skills-system.md) | Skills system | 3 d | M8-01, M2-03 |
-| M8-05 | [step-05-skill-evals.md](step-05-skill-evals.md) | Skill evals | 2 d | M8-04 |
-| M8-06 | [step-06-model-scorecard-and-learning-loop.md](step-06-model-scorecard-and-learning-loop.md) | Model Scorecard & learning loop | 2.5 d | M3-04, M4-01 |
-| M8-07 | [step-07-playbook-editor.md](step-07-playbook-editor.md) | Playbook editor | 1.5 d | M3-01, M8-01 |
-| M8-08 | [step-08-instruction-fragments-auto-answer-and-notifications-editors.md](step-08-instruction-fragments-auto-answer-and-notifications-editors.md) | Instruction fragments, auto-answer & notifications editors | 2 d | M8-01 |
+| M8-01 | [step-01](step-01-layered-settings-engine.md) | Layered settings engine | 2.5 d | M2-09 |
+| M8-02 | [step-02](step-02-policy-roles-task-type-editors.md) | Policy, roles, task-type editors | 3 d | M8-01 |
+| M8-03 | [step-03](step-03-prompt-library.md) | Prompt library | 1.5 d | M8-01 |
+| M8-04 | [step-04](step-04-skills-system.md) | Skills system | 3 d | M8-01, M2-03 |
+| M8-05 | [step-05](step-05-skill-evals.md) | Skill evals | 2 d | M8-04, M3-03 |
+| M8-06 | [step-06](step-06-model-scorecard-and-learning-loop.md) | Model Scorecard & learning loop | 2.5 d | M3-04, M4-01, M8-01, M8-05 |
+| M8-07 | [step-07](step-07-playbook-editor.md) | Playbook editor | 1.5 d | M3-01, M8-01 |
+| M8-08 | [step-08](step-08-instruction-fragments-auto-answer-and-notifications-editors.md) | Instruction fragments, auto-answer & notifications editors | 2 d | M8-01, M8-04, M1-11 |
 
 ## What you can test after this milestone
 
@@ -90,3 +90,6 @@ After M8 the intelligence layer is fully **data, not code** (D7): every knob tha
 - **M8-06** depends only on M3-04 and M4-01 and can start on day 1 in parallel with M8-01; it registers its `learning` settings section once M8-01 lands.
 - **M8-05** waits for M8-04 (artifact format, installer) and benefits from M8-06's `RecordOutcome` use case; if M8-06 is late, M8-05 writes `outcomes` rows directly through the repository and M8-06 adopts them.
 - Critical path: M8-01 (2.5) → M8-04 (3) → M8-05 (2) = 7.5 d; with three lanes the milestone fits in ~8–9 working days.
+
+## Revised release boundary (2026-09-15)
+Complete every required step above and its regression scenarios; optional gated steps do not block the milestone. [DEPENDENCIES.md](../DEPENDENCIES.md) gives the actual order. Capability-specific provider evidence, explicit recovery outcomes and commit-bound validation govern the exit criteria; no live result is implied by this plan update.

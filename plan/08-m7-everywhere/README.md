@@ -3,9 +3,9 @@
 | | |
 |---|---|
 | Steps | 7 (M7-01 … M7-07) |
-| Effort | ~15 days |
+| Effort | 15 working days (sum of step estimates; optional work included) |
 | Status | ⬜ |
-| Entry | M1-13 ✅ (MVP tag `mvp-1`); M5-05 ✅ (restore with zero lost prompts, `sinceEventId` WS protocol); Rust toolchain installed (`rustup`, ENVIRONMENT.md says **missing**); Apple Developer Program membership active with a Developer ID Application certificate |
+| Entry | M1-13 ✅ (MVP tag `mvp-1`); M5-05 ✅ (restore with durable captured prompts with explicit recovery outcomes, `sinceEventId` WS protocol); Rust toolchain installed (`rustup`, ENVIRONMENT.md says **missing**); Apple Developer Program membership active with a Developer ID Application certificate |
 | Exit | a signed and notarized Orchestra.app installs on a clean Mac with **zero Gatekeeper dialogs**, updates itself through a verified round-trip, and the same fleet is reachable from an installed PWA on a phone over a private tunnel where an `AgentPrompt` can be **approved from the lock-screen notification**, from any of several hosts, and scripted from `orch` |
 
 ## Goal
@@ -38,13 +38,13 @@ D1 says the product is a headless daemon plus one web UI wrapped in a Tauri app 
 ## Steps
 | ID | File | Title | Effort | Depends |
 |---|---|---|---|---|
-| M7-01 | [step-01](step-01-tauri-desktop-shell.md) | Tauri desktop shell | 3 d | M1-13 |
-| M7-02 | [step-02](step-02-signing-notarization-updater.md) | Signing, notarization, updater | 2.5 d | M7-01 |
-| M7-03 | [step-03](step-03-pwa-and-web-push.md) | PWA & Web Push | 2.5 d | M0-07, M5-05 (∥ with M7-01/02) |
-| M7-04 | [step-04](step-04-remote-access-and-auth.md) | Remote access & auth | 1.5 d | M0-04 (∥) |
-| M7-05 | [step-05](step-05-multi-host.md) | Multi-host | 2.5 d | M7-04 |
-| M7-06 | [step-06](step-06-orch-cli.md) | `orch` CLI | 2 d | M0-06 (∥) |
-| M7-07 | [step-07](step-07-cloud-session-aggregation-optional.md) | Cloud-session aggregation (optional, P3) | 1 d | M7-05 |
+| M7-01 | [step-01](step-01-tauri-desktop-shell.md) | Tauri desktop shell | 3 d | M1-13, M1-09, M1-10, M1-11, M1-02, M0-04 |
+| M7-02 | [step-02](step-02-signing-notarization-updater.md) | Signing, notarization, updater | 2.5 d | M7-01, M0-08, M6-07 |
+| M7-03 | [step-03](step-03-pwa-and-web-push.md) | PWA & Web Push | 2.5 d | M0-07, M5-05, M1-11, M0-04, M7-04 |
+| M7-04 | [step-04](step-04-remote-access-and-auth.md) | Remote access & auth | 1.5 d | M0-04, M0-06, M0-08 |
+| M7-05 | [step-05](step-05-multi-host.md) | Multi-host | 2.5 d | M7-04, M0-06, M5-05, M1-10, M1-11, M7-06 |
+| M7-06 | [step-06](step-06-orch-cli.md) | `orch` CLI | 2 d | M0-06, M7-04, M1-08, M6-01, M2-01, M2-02, M5-04 |
+| M7-07 | [step-07](step-07-cloud-session-aggregation-optional.md) | Cloud-session aggregation (optional, P3) | 1 d | M7-05, M2-03, M1-04, M6-01 |
 
 ## What you can test after this milestone
 - Orchestra as a real Mac app in the dock and the menu bar, not a browser tab you have to remember to open.
@@ -83,3 +83,6 @@ M7-05 needs M7-04's auth strategy interface and M7-06's host-URL flag convention
 
 ## Evidence
 Screenshots (tray, notification, phone lock screen, Gatekeeper-free install), `spctl`/`codesign` output, notarization log URLs, updater round-trip recording and the offline-queue event dump go in `evidence/` (create the folder at M7-01).
+
+## Revised release boundary (2026-09-15)
+Complete every required step above and its regression scenarios; optional gated steps do not block the milestone. [DEPENDENCIES.md](../DEPENDENCIES.md) gives the actual order. Capability-specific provider evidence, explicit recovery outcomes and commit-bound validation govern the exit criteria; no live result is implied by this plan update.

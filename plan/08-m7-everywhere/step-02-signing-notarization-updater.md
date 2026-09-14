@@ -4,7 +4,7 @@
 |---|---|
 | Milestone | M7 — Everywhere |
 | Status | ⬜ Not started |
-| Depends on | M7-01 (Tauri shell + sidecar build manifest), M0-08 (CI & quality gates), M6-07 (Health screen — the update card lands there) |
+| Depends on | M7-01, M0-08, M6-07 |
 | Estimated effort | 2.5 days |
 | Packages touched | `apps/desktop` (`src-tauri/entitlements.plist`, updater config, update UI plugin wiring), `apps/web` (update banner + Health → Updates card), `apps/daemon` (`GET /api/v1/updates/state` passthrough), `tools/scripts` (`sign-bundle.sh`, `verify-bundle.sh`, `make-manifest.ts`), `.github/workflows/release.yml`, `docs/deployment/` |
 | Risk | High (notarization rejections are slow; a bad updater key is unrecoverable) |

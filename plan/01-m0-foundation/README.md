@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| Steps | 8 (M0-01 … M0-08) |
-| Effort | ~17 days |
+| Steps | 9 (M0-01 … M0-09) |
+| Effort | 20 working days (sum of step estimates; optional work included) |
 | Status | ⬜ |
 | Entry | none — first milestone |
 | Exit | daemon boots with SQLite, web shell loads and connects over WS, a `FakeProvider` session runs end-to-end through the API in CI, all quality gates green |
@@ -38,8 +38,9 @@ Everything in the product plan depends on three things being right from day one:
 | M0-04 | [step-04](step-04-daemon-skeleton.md) | Daemon skeleton | 2.5 d | M0-02 |
 | M0-05 | [step-05](step-05-event-store-and-repositories.md) | Event store & repositories | 1.5 d | M0-04 |
 | M0-06 | [step-06](step-06-http-api-ws-gateway-v1.md) | HTTP API + WS gateway v1 | 2 d | M0-05 |
-| M0-07 | [step-07](step-07-web-shell.md) | Web shell | 2.5 d | M0-06 (∥ from M0-04) |
-| M0-08 | [step-08](step-08-ci-and-quality-gates.md) | CI & quality gates | 2 d | M0-03 (∥ from M0-01) |
+| M0-07 | [step-07](step-07-web-shell.md) | Web shell | 2.5 d | M0-06 |
+| M0-08 | [step-08](step-08-ci-and-quality-gates.md) | CI & quality gates | 2 d | M0-01, M0-03 |
+| M0-09 | [step-09](step-09-provider-feasibility-gates-and-evidence-matrix.md) | Provider feasibility gates & evidence matrix | 3 d | M0-03 |
 
 ## What you can test after this milestone
 - Start the daemon, open the web UI, see it connect.
@@ -64,3 +65,6 @@ Everything in the product plan depends on three things being right from day one:
 
 ## Parallelization
 M0-03 and M0-04 can run in parallel after M0-02. M0-07 can start against a stubbed WS as soon as M0-06's message schema is agreed. M0-08 can start right after M0-01 and be completed after M0-03.
+
+## Revised release boundary (2026-09-15)
+Complete every required step above and its regression scenarios; optional gated steps do not block the milestone. [DEPENDENCIES.md](../DEPENDENCIES.md) gives the actual order. Capability-specific provider evidence, explicit recovery outcomes and commit-bound validation govern the exit criteria; no live result is implied by this plan update.

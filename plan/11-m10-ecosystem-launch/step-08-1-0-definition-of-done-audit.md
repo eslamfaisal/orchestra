@@ -4,7 +4,7 @@
 |---|---|
 | Milestone | M10 — Ecosystem & 1.0 |
 | Status | ⬜ Not started |
-| Depends on | All milestones M0 … M9 and steps M10-01 … M10-07 |
+| Depends on | M0-01, M0-02, M0-03, M0-04, M0-05, M0-06, M0-07, M0-08, M0-09, M1-01, M1-02, M1-03, M1-04, M1-05, M1-06, M1-08, M1-09, M1-10, M1-11, M1-12, M1-13, M2-01, M2-02, M2-03, M2-04, M2-05, M2-06, M2-07, M2-08, M2-09, M3-01, M3-02, M3-03, M3-04, M3-05, M3-06, M3-07, M3-08, M3-09, M4-01, M4-02, M4-03, M4-04, M4-05, M4-06, M4-07, M5-01, M5-02, M5-03, M5-04, M5-05, M5-06, M6-01, M6-02, M6-03, M6-04, M6-05, M6-06, M6-07, M7-01, M7-02, M7-03, M7-04, M7-05, M7-06, M8-01, M8-02, M8-03, M8-04, M8-05, M8-06, M8-07, M8-08, M9-01, M9-02, M9-03, M9-04, M9-05, M9-06, M9-07, M9-08, M9-09, M10-01, M10-02, M10-03, M10-04, M10-05, M10-06, M10-07 |
 | Estimated effort | 1.5 days |
 | Packages touched | `plan/` (audit record + evidence), `docs/` (release notes, launch page), `.github/` (release checklist), no product code except gap fixes raised as their own steps |
 | Risk | Medium (the risk is declaring done what is not; the mitigation is that this step ships no features) |
@@ -83,7 +83,7 @@ None. The audit adds a `1.0 audit` section to `PROGRESS.md` linking the record, 
 |---|---|---|---|
 | Typecheck / lint / arch | `pnpm typecheck && pnpm lint && pnpm depcruise` | CI, Node 22 + 24 | run link |
 | Unit + application + coverage | `pnpm test -- --coverage` | CI | coverage report |
-| Contract / fixtures matrix | `fixtures-matrix.yml` for all five providers | CI, **no vendor credentials** (C9) | `dod-01-contract-matrix.json` |
+| Contract / fixtures matrix | `fixtures-matrix.yml` for the four required providers (Antigravity only when its gate is resolved) | CI, **no vendor credentials** (C9) | `dod-01-contract-matrix.json` |
 | Parser fuzz | fast-check suites | CI | run link |
 | Integration (tmux, git, sqlite, recorder, hooks) | `pnpm test:integration` | CI ubuntu + local macOS | run links |
 | E2E | Playwright with `FakeProvider` | CI | HTML report |
@@ -137,7 +137,7 @@ Explicitly **not** done: automatic crash reporting, usage analytics, install pin
 - [ ] Create `evidence/` with the directory layout in §4.2 and a `README.md` stating the naming rules (build hash in every filename).
 - [ ] Cut `v1.0.0-rc.1` through the M10-07 pipeline; record the build hash everywhere.
 - [ ] Re-run the full matrix in §4.4 on that build; archive every output; link each from the audit rows.
-- [ ] DoD-1: run the fixtures matrix for all five providers; confirm each includes an approval round-trip fixture and a rate-limit fixture; export the report.
+- [ ] DoD-1: run the fixtures matrix for the four required providers (Antigravity only when its gate is resolved); confirm each includes an approval round-trip fixture and a rate-limit fixture; export the report.
 - [ ] DoD-2/3: re-run the M3-09 mission on a real repository across two providers; capture the PR, the review rounds and the reviewer-provider check.
 - [ ] DoD-4/8: one screenshot per provider × {web, PWA} of a prompt answered through its declared transport, and one forecast screenshot per provider with the *official*/*estimate* label visible (noting providers that legitimately have no window, M10-05 B4).
 - [ ] DoD-5/7: inject drift 20 times and record detect/remediate p50/p95; `kill -9` the daemon mid-prompt five times and compare prompt counts and payloads; archive both transcripts.
@@ -160,7 +160,7 @@ Explicitly **not** done: automatic crash reporting, usage analytics, install pin
 | AT-M10-08-01 | ci | full gate suite on the RC tag (typecheck, lint, depcruise, unit, application, contract, integration, e2e) | all green on the exact release build; run links archived |
 | CT-M10-08-01 | contract | fixtures matrix across claude, codex, agy, kimi, opencode | every provider passes all seven specs, including an approval round-trip and a rate-limit fixture |
 | IT-M10-08-01 | integration | egress suite (daemon, registry, plugins, drift reports, opencode) | only allowlisted hosts contacted; zero egress with the optional features disabled |
-| IT-M10-08-02 | integration | restore test: `kill -9` mid-prompt ×5 | prompt count and content identical after restart; zero lost prompts |
+| IT-M10-08-02 | integration | restore test: `kill -9` mid-prompt ×5 | prompt count and content identical after restart; durable captured prompts with explicit recovery outcomes |
 | IT-M10-08-03 | integration | SLO harness: 20 injected drifts | p95 time-to-detect < 60 s and p95 safe-remediation < 10 s |
 | IT-M10-08-04 | integration | supply-chain verification of the RC assets | cosign verify OK, provenance names this repo/workflow, SBOM parses, Scorecard ≥ 7, `pnpm audit --prod` clean |
 | E2E-M10-08-01 | e2e | the M1-13 and M3-09 demo scripts replayed against the RC | both complete without manual intervention beyond the scripted approvals |
@@ -173,7 +173,7 @@ Explicitly **not** done: automatic crash reporting, usage analytics, install pin
 | TC-M10-08-01 | Every DoD row is evidenced | 1. Open `1.0-audit.md`. 2. Follow all 14 evidence links. | Every link resolves to an archived artifact or permalink naming the RC build hash; no row is empty or aggregated (A1, A2) | ⬜ |
 | TC-M10-08-02 | **Third-party plugin, unaided** | 1. Hand the external author only the published docs URL. 2. Do not answer questions verbally; write every answer into the docs. 3. Install their plugin on a machine that has never seen the repo. | Their plugin installs from the registry (or GitHub with `--trust local`), passes the contract smoke, appears on Fleet, and required **zero** core PRs; transcript archived (A5) | ⬜ |
 | TC-M10-08-03 | SLOs on real hardware | 1. Run the 20-drift SLO harness on the dev machine with real CLIs. 2. Read `dod-05-slo.json`. | p95 detect < 60 s, p95 remediate < 10 s, n = 20, outliers explained in the notes | ⬜ |
-| TC-M10-08-04 | Zero lost prompts | 1. Open prompts on three providers. 2. `kill -9` the daemon. 3. Restart and compare. | Same prompts, same payloads, same open state; answering after restart still reaches the agent | ⬜ |
+| TC-M10-08-04 | Durable captured prompts with explicit recovery outcomes | 1. Open prompts on three providers. 2. `kill -9` the daemon. 3. Restart and compare. | Same prompts, same payloads, same open state; answering after restart still reaches the agent | ⬜ |
 | TC-M10-08-05 | **Negative: compliance line cannot be deferred** | 1. Set DoD-14 to `⏸` in the audit record. 2. Run `check-audit.ts`. | Linter fails naming rule A4; the release gate stays closed | ⬜ |
 | TC-M10-08-06 | **Negative: stale evidence rejected** | 1. Point a DoD row at a green run from a previous build. 2. Run `check-audit.ts`. | Fails because the build hash does not match the RC; forces a re-run (A1) | ⬜ |
 | TC-M10-08-07 | Supply-chain verification by a third party | 1. On another machine, verify signatures, provenance and the SBOM using only `docs/release-process.md`. | All verify with public tooling; Scorecard ≥ 7 and Best Practices *passing* pages reachable and truthful | ⬜ |
@@ -186,7 +186,7 @@ Explicitly **not** done: automatic crash reporting, usage analytics, install pin
 ## 7. Acceptance criteria (Definition of Done)
 - [ ] `1.0-audit.md` exists with all 14 DoD rows, each carrying a verdict, evidence, the RC build hash and a date; `check-audit.ts` passes (TC-01, AT-02).
 - [ ] The full gate matrix (§4.4) was re-run on the RC build and archived; no suite was accepted from an older build (TC-06).
-- [ ] Contract tests pass for all five providers, including approval round-trips and quota parsing (CT-M10-08-01).
+- [ ] Contract tests pass for the four required providers (Antigravity only when its gate is resolved), including approval round-trips and quota parsing (CT-M10-08-01).
 - [ ] SLOs measured on real hardware meet < 60 s detect and < 10 s safe remediation at p95, and prompts survive five `kill -9` runs with zero loss (TC-03, TC-04).
 - [ ] Supply chain verified independently: signed artifacts, npm provenance, SBOM, Scorecard ≥ 7, OpenSSF Best Practices *passing* (TC-07).
 - [ ] DoD-11 proven by an external author with no core PR, transcript archived (TC-02).

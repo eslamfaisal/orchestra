@@ -4,7 +4,7 @@
 |---|---|
 | Milestone | M6 — Self-maintenance |
 | Status | ⬜ Not started |
-| Depends on | M2-03 (full manifests), M0-04 (config, storage), M0-08 (egress test) |
+| Depends on | M2-03, M0-04, M0-08 |
 | Estimated effort | 2 days |
 | Packages touched | `packages/sdk`, `packages/core`, `apps/daemon`, `apps/cli`, `packages/providers/claude`, `packages/providers/codex`, `packages/providers/agy` |
 | Risk | High |

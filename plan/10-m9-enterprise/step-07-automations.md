@@ -4,7 +4,7 @@
 |---|---|
 | Milestone | M9 — Enterprise |
 | Status | ⬜ Not started |
-| Depends on | M3-02 |
+| Depends on | M3-02, M4-04, M9-01, M9-04 |
 | Estimated effort | 2.5 days |
 | Packages touched | `packages/core` (`src/automations/`), `packages/catalog` (`schemas/automation.schema.ts`), `apps/daemon` (`src/application/automations`, `src/infrastructure/automations/{scheduler,watchers}`, `src/infrastructure/persistence`, `src/interface/http`, `src/interface/ws`), `apps/web` (Settings → Automations, run history), `apps/cli` (`orch automation`) |
 | Risk | Medium (a misfiring trigger can start an unbounded number of missions) |

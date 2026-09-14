@@ -4,8 +4,8 @@
 |---|---|
 | Milestone | M1 — MVP: Live fleet |
 | Status | ⬜ Not started |
-| Depends on | M1-02, M1-04 |
-| Estimated effort | 4 days |
+| Depends on | M0-09, M1-02, M1-04 |
+| Estimated effort | 5 days |
 | Packages touched | `packages/providers/claude`, `apps/daemon/src/interface/hooks` (receiver used here, formalised in M1-08) |
 | Risk | High (first real adapter; R1, R5) |
 | Owner | |

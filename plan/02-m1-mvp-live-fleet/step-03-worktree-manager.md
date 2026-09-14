@@ -4,7 +4,7 @@
 |---|---|
 | Milestone | M1 — MVP: Live fleet |
 | Status | ⬜ Not started |
-| Depends on | M0-04 (∥ with M1-01/02) |
+| Depends on | M0-04 |
 | Estimated effort | 2 days |
 | Packages touched | `apps/daemon/src/application/worktrees`, `apps/daemon/src/infrastructure/git`, `packages/core` (Worktree) |
 | Risk | Medium |

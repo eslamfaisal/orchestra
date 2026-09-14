@@ -4,7 +4,7 @@
 |---|---|
 | Milestone | M1 — MVP: Live fleet (optional for MVP exit; required for M3) |
 | Status | ⬜ Not started |
-| Depends on | M1-02, M1-04 (∥ with M1-05/06) |
+| Depends on | M0-09, M1-02, M1-04 |
 | Estimated effort | 3 days |
 | Packages touched | `packages/providers/agy`, `apps/daemon` (ToS acknowledgement endpoint), `apps/web` (opt-in dialog) |
 | Risk | High (R4 ToS; undocumented quota numerics) |
@@ -45,13 +45,16 @@ Headless mode runs in a tmux pane too (`agy -p …` with the daemon attached to 
 ### 4.5 API / UI surface
 `PATCH /providers/agy` (ack), Fleet card (M1-10).
 ### 4.6 Flow
-`ack → enabled → start → hooks config written in worktree → agy runs → PreToolUse hook → prompt → answer via hook response → continues`.
+`terms resolution + technical evidence + ack → enabled → start → hooks config written in worktree → agy runs → PreToolUse hook → prompt → answer via hook response → continues`.
+
+### 4.7 Review reconciliation contract (2026-09-15)
+Start gate requires both written ADR-008 terms resolution and per-mode technical evidence; a ToS checkbox alone never enables the adapter. Treat headless control_request/control_response as unsupported per the supplied review until contrary version-specific evidence exists. A soft-denied required tool means incomplete task even if process exit is 0. The headless /usage probe is unverified and disabled until its documented support and consumption behavior are proven. Unsupported interactions stay manual-only/disabled; no mandatory milestone or KPI requires this adapter.
 
 ## 5. Tasks
 - [ ] ToS acknowledgement endpoint + audit + Fleet dialog copy (EN/AR).
 - [ ] Manifest v0 with `tos`, models, hooks, headless.
 - [ ] Generalise `orch-hook.mjs` to `--provider agy` (shared bin in `packages/sdk/bin`).
-- [ ] `AgyLauncher` (interactive/headless + preLaunchFiles hook config), `AgyAuthProbe` (quota-free status "(verify command)"), `AgyQuotaProbe` (`-p "/usage"` parser), `AgyTelemetryParser`, `AgyRateLimitParser`, `AgyPaneController` (keystroke map).
+- [ ] `AgyLauncher` (interactive/headless + preLaunchFiles hook config), `AgyAuthProbe` (quota-free status "(verify command)"), optional `AgyQuotaProbe` only after separate evidence; otherwise unavailable, `AgyTelemetryParser`, `AgyRateLimitParser`, `AgyPaneController` (keystroke map).
 - [ ] Record fixtures: each hook kind, a headless multi-turn stream, `/usage` output, an approval prompt transcript for keystroke mapping, exit codes.
 - [ ] Contract + fuzz tests; register adapter; Fleet integration.
 - [ ] Docs: `packages/providers/agy/README.md` compliance section (what we do / never do).
@@ -72,17 +75,22 @@ Headless mode runs in a tmux pane too (`agy -p …` with the daemon attached to 
 ### 6.2 Manual test cases (real agy, scratch repo)
 | ID | Scenario | Steps | Expected result | Status |
 |---|---|---|---|---|
-| TC-M1-07-01 | Opt-in gate | 1. Fleet shows agy "requires acknowledgement" 2. try start | refused with clear message; acknowledge → enabled; audit row | ⬜ |
+| TC-M1-07-01 | Opt-in gate | 1. Fleet shows agy "requires acknowledgement" 2. try start | refused with clear message; acknowledgement alone leaves disabled until both gates pass; audit row | ⬜ |
 | TC-M1-07-02 | Interactive + hook prompt | 1. start agy (Gemini Flash) 2. ask it to create a file | `PreToolUse` prompt in Attention; allow → file created | ⬜ |
 | TC-M1-07-03 | PTY approval fallback | 1. trigger an approval that has no hook decision path (per fixtures) | AgentPrompt with `send-keys-acked`; answer → keystrokes → proceeds | ⬜ |
 | TC-M1-07-04 | Headless multi-turn | 1. `orch dev run agy --headless` with two turns | both turns processed; events streamed; exit 0 | ⬜ |
 | TC-M1-07-05 | Usage probe | 1. `POST /providers/agy/quota` | windows shown with `estimate` label; no session created | ⬜ |
 | TC-M1-07-06 | Compliance grep | 1. `grep -r "antigravity.google\|remote-control" packages/providers/agy/src` | only in manifest `updateSources`/docs, never in code paths making requests | ⬜ |
 
+### 6.3 Review regression scenarios
+- [ ] Terms gate unresolved with checkbox accepted: adapter still disabled.
+- [ ] Soft-denied required tool with exit 0: task not completed.
+- [ ] Unsupported control input is not sent; absent usage probe stays unknown.
+
 ## 7. Acceptance criteria
-- [ ] Adapter disabled until in-product ToS acknowledgement; audited.
-- [ ] Interactive + headless modes on real `agy`; hooks round-trip; fallback keystrokes work.
-- [ ] `/usage` probe parsed with confidence labels.
+- [ ] Adapter disabled until ADR-008 terms resolution, per-mode evidence and in-product acknowledgement; audited.
+- [ ] Only evidenced modes/features enabled; unsupported headless controls stay disabled.
+- [ ] Usage remains unknown unless a documented and separately evidenced probe exists.
 - [ ] Contract/fuzz/egress tests green; fixtures recorded.
 - [ ] All TC pass; no new lint/arch violations.
 

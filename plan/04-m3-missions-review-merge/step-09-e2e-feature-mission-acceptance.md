@@ -4,7 +4,7 @@
 |---|---|
 | Milestone | M3 — Missions, review & merge |
 | Status | ⬜ Not started |
-| Depends on | M3-01, M3-02, M3-03, M3-04, M3-05, M3-06, M3-07, M3-08 (all M3) |
+| Depends on | M3-01, M3-02, M3-03, M3-04, M3-05, M3-06, M3-07, M3-08 |
 | Estimated effort | 2.5 days |
 | Packages touched | `plan/04-m3-missions-review-merge/evidence/`, `apps/daemon` (fixes only), `apps/web` (fixes only), `packages/catalog` (playbook tuning), `.github/workflows` (E2E job), `docs/` |
 | Risk | High |
@@ -143,7 +143,7 @@ plan/04-m3-missions-review-merge/evidence/
 | E2E-M3-09-01 | e2e (Playwright, CI) | FakeProvider mission: plan → 2 parallel tasks → cross-vendor review (2 rounds) → merge → stubbed PR | completes green in < 5 min; no real binary invoked (asserted by the binary allowlist spy) |
 | E2E-M3-09-02 | e2e (CI) | cross-vendor constraint in the fixture | reviewer fake provider id ≠ author fake provider id for every reviewed task; zero degraded reviews |
 | E2E-M3-09-03 | e2e (CI) | parallel isolation in the fixture | the two implementation tasks hold distinct ports and db suffixes; both dev-server stubs answer |
-| IT-M3-09-01 | integration (CI) | daemon restart injected mid-mission in the fixture | mission completes; zero duplicate `task_results` / `reviews` rows; zero lost prompts |
+| IT-M3-09-01 | integration (CI) | daemon restart injected mid-mission in the fixture | mission completes; zero duplicate `task_results` / `reviews` rows; durable captured prompts with explicit recovery outcomes |
 | CT-M3-09-01 | contract (CI) | acceptance SQL assertions run against the fixture's database | all four assertions hold (cross-vendor 0, review coverage 100 %, distinct ports, pr_url set) |
 | UT-M3-09-01 | unit | `orch mission export` serializer on a fixture mission | stable JSON shape, no secret-shaped fields (regex assertion, same as the auth contract test) |
 

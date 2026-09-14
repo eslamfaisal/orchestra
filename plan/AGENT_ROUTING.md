@@ -101,7 +101,7 @@ Generated from `ROADMAP.md`. Main session = orchestrator (never implements). Eac
 | M5-02 | [Conversation & tool-call capture v2](06-m5-history-replay/step-02-conversation-and-tool-call-capture-v2.md) | 2.5 | B | `orchestra-implementer (high)` | `orchestra-reviewer (high)` | fully specified; standard implementation |
 | M5-03 | [FTS5 search](06-m5-history-replay/step-03-fts5-search.md) | 1.5 | C | `orchestra-builder (medium)` | `orchestra-reviewer (high)` | FTS tables + search screen |
 | M5-04 | [Timeline & Replay UI](06-m5-history-replay/step-04-timeline-and-replay-ui.md) | 3 | B | `orchestra-implementer (high)` | `orchestra-reviewer (high)` | fully specified; standard implementation |
-| M5-05 | [Session restore with zero lost prompts](06-m5-history-replay/step-05-session-restore-with-zero-lost-prompts.md) | 2.5 | A+ | `orchestra-architect-max (max)` | `orchestra-reviewer-deep (xhigh)` | restore with zero lost prompts; catastrophic if subtly wrong |
+| M5-05 | [Session restore with durable captured prompts with explicit recovery outcomes](06-m5-history-replay/step-05-session-restore-with-zero-lost-prompts.md) | 2.5 | A+ | `orchestra-architect-max (max)` | `orchestra-reviewer-deep (xhigh)` | restore with durable captured prompts with explicit recovery outcomes; catastrophic if subtly wrong |
 | M5-06 | [Retention, redaction, export/import](06-m5-history-replay/step-06-retention-redaction-export-import.md) | 2 | B | `orchestra-implementer (high)` | `orchestra-reviewer (high)` | fully specified; standard implementation |
 
 ## M6 — Self-maintenance
@@ -126,7 +126,7 @@ Generated from `ROADMAP.md`. Main session = orchestrator (never implements). Eac
 | M7-04 | [Remote access & auth](08-m7-everywhere/step-04-remote-access-and-auth.md) | 1.5 | B | `orchestra-implementer (high)` | `orchestra-reviewer (high)` | fully specified; standard implementation |
 | M7-05 | [Multi-host](08-m7-everywhere/step-05-multi-host.md) | 2.5 | B | `orchestra-implementer (high)` | `orchestra-reviewer (high)` | fully specified; standard implementation |
 | M7-06 | [`orch` CLI](08-m7-everywhere/step-06-orch-cli.md) | 2 | C | `orchestra-builder (medium)` | `orchestra-reviewer (high)` | CLI consolidation |
-| M7-07 | [Cloud-session aggregation (optional)](08-m7-everywhere/step-07-cloud-session-aggregation-optional.md) | 1 | B | `orchestra-implementer (high)` | `orchestra-reviewer (high)` | fully specified; standard implementation |
+| M7-07 | [Cloud-session aggregation (optional, P3)](08-m7-everywhere/step-07-cloud-session-aggregation-optional.md) | 1 | B | `orchestra-implementer (high)` | `orchestra-reviewer (high)` | fully specified; standard implementation |
 
 ## M8 — Customization & skills
 
@@ -161,7 +161,7 @@ Generated from `ROADMAP.md`. Main session = orchestrator (never implements). Eac
 |---|---|---|---|---|---|---|
 | M10-01 | [Repair Agent (ladder 3)](11-m10-ecosystem-launch/step-01-repair-agent-ladder-3.md) | 4 | A+ | `orchestra-architect-max (max)` | `orchestra-reviewer-deep (xhigh)` | Repair Agent guardrails; catastrophic if subtly wrong |
 | M10-02 | [Community drift loop](11-m10-ecosystem-launch/step-02-community-drift-loop.md) | 2 | B | `orchestra-implementer (high)` | `orchestra-reviewer (high)` | fully specified; standard implementation |
-| M10-03 | [Plugin/skill/playbook registry](11-m10-ecosystem-launch/step-03-plugin-skill-playbook-registry.md) | 3 | A | `orchestra-architect (xhigh)` | `orchestra-reviewer-deep (xhigh)` | plugin registry trust + verification |
+| M10-03 | [Plugin / skill / playbook registry](11-m10-ecosystem-launch/step-03-plugin-skill-playbook-registry.md) | 3 | A | `orchestra-architect (xhigh)` | `orchestra-reviewer-deep (xhigh)` | plugin registry trust + verification |
 | M10-04 | [Kimi adapter](11-m10-ecosystem-launch/step-04-kimi-adapter.md) | 2.5 | B | `orchestra-implementer (high)` | `orchestra-reviewer (high)` | fully specified; standard implementation |
 | M10-05 | [OpenCode adapter](11-m10-ecosystem-launch/step-05-opencode-adapter.md) | 2.5 | B | `orchestra-implementer (high)` | `orchestra-reviewer (high)` | fully specified; standard implementation |
 | M10-06 | [Docs site](11-m10-ecosystem-launch/step-06-docs-site.md) | 2.5 | C | `orchestra-builder (medium)` | `orchestra-reviewer (high)` | docs site |

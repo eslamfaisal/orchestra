@@ -73,9 +73,9 @@ answerState: pending → submitted → acknowledged
 | `acknowledged` | a **structured** ack proved delivery: a hook response consumed, an RPC response, or an MCP tool result. Echoed terminal text, a later unrelated message, or a process exit **never** move a prompt here |
 | `expired` | the provider-side window for answering closed before an ack |
 | `cancelled` | the session ended, or the user withdrew the prompt |
-| `delivery_uncertain` | terminal state for an answer sent over `send-keys-acked` where the provider documents no ack event — we do not know whether it landed, and we say so |
+| `delivery_uncertain` | unresolved delivery outcome after a possible send without correlated acknowledgement — we do not know whether it landed, and we say so |
 
-Lifecycle: `open → answered → delivered → acknowledged`; `open → expired → (fallback transport) open`; `open → cancelled (session ended)`. Recovery and KPI reporting count each `answerState` separately and never fold `expired`/`cancelled`/`delivery_uncertain` into "recovered".
+Canonical answer state: `pending → submitted → acknowledged`; pending/submitted may expire or cancel, and submission with uncertain outcome becomes delivery_uncertain. Legacy open/answered/delivered names are compatibility events only; expired prompts never reopen without a new provider request identity. Recovery and KPI reporting count each `answerState` separately and never fold `expired`/`cancelled`/`delivery_uncertain` into "recovered".
 ### RepairCase
 ```
 detected → classified → auto_fixing → fixed

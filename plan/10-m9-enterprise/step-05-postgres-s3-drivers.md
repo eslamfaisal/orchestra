@@ -4,7 +4,7 @@
 |---|---|
 | Milestone | M9 — Enterprise |
 | Status | ⬜ Not started |
-| Depends on | M0-05 |
+| Depends on | M0-05, M5-06, M9-04 |
 | Estimated effort | 3 days |
 | Packages touched | `apps/daemon` (`src/infrastructure/persistence/{sqlite,postgres,migrations}`, `src/infrastructure/search`, `src/infrastructure/recorder/stores`, `src/interface/config`), `apps/cli` (`orch storage`), `packages/core` (ports only — `SearchPort`, `RecordingStore` unchanged), `deploy/compose` |
 | Risk | High (the storage seam is under every feature built in M0–M8) |

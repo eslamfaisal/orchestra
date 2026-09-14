@@ -4,7 +4,7 @@
 |---|---|
 | Milestone | M7 — Everywhere |
 | Status | ⬜ Not started |
-| Depends on | M0-06 (HTTP API + WS gateway, SDK DTOs), M7-04 (token model, `--host` over a tunnel); consolidates commands introduced by M0-06 (`orch dev emit`), M1-08 (`orch fixtures record\|list\|verify`), M6-01 (`orch doctor`), M2-01/M2-02 (catalog validation), M5-04 (replay) |
+| Depends on | M0-06, M7-04, M1-08, M6-01, M2-01, M2-02, M5-04 |
 | Estimated effort | 2 days |
 | Packages touched | `apps/cli` (the whole package: command registry, commands, output, completions), `packages/sdk` (API client + DTO reuse), `apps/daemon` (a few thin endpoints listed in §4.5), `docs/` (CLI reference page) |
 | Risk | Low (no new substrate; the risk is scope creep into a second UI) |

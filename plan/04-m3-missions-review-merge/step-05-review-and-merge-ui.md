@@ -5,7 +5,7 @@
 | Milestone | M3 — Missions, review & merge |
 | Status | ⬜ Not started |
 | Depends on | M3-04 |
-| Estimated effort | 3 days |
+| Estimated effort | 4 days |
 | Packages touched | `apps/web` (screens/review), `packages/ui`, `apps/daemon` (application/reviews, application/merge, infrastructure/git, interface/http, interface/ws) |
 | Risk | Medium |
 | Owner | |

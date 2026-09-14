@@ -115,7 +115,7 @@ Folder: `06-m5-history-replay/` · [README](06-m5-history-replay/README.md)
 | M5-02 | Conversation & tool-call capture v2 | [step-02-conversation-and-tool-call-capture-v2.md](06-m5-history-replay/step-02-conversation-and-tool-call-capture-v2.md) | 2.5 d | ⬜ | | | | |
 | M5-03 | FTS5 search | [step-03-fts5-search.md](06-m5-history-replay/step-03-fts5-search.md) | 1.5 d | ⬜ | | | | |
 | M5-04 | Timeline & Replay UI | [step-04-timeline-and-replay-ui.md](06-m5-history-replay/step-04-timeline-and-replay-ui.md) | 3 d | ⬜ | | | | |
-| M5-05 | Session restore with zero lost prompts | [step-05-session-restore-with-zero-lost-prompts.md](06-m5-history-replay/step-05-session-restore-with-zero-lost-prompts.md) | 2.5 d | ⬜ | | | | |
+| M5-05 | Session restore with durable captured prompts with explicit recovery outcomes | [step-05-session-restore-with-zero-lost-prompts.md](06-m5-history-replay/step-05-session-restore-with-zero-lost-prompts.md) | 2.5 d | ⬜ | | | | |
 | M5-06 | Retention, redaction, export/import | [step-06-retention-redaction-export-import.md](06-m5-history-replay/step-06-retention-redaction-export-import.md) | 2 d | ⬜ | | | | |
 
 ### M6 — Self-maintenance
@@ -142,7 +142,7 @@ Folder: `08-m7-everywhere/` · [README](08-m7-everywhere/README.md)
 | M7-04 | Remote access & auth | [step-04-remote-access-and-auth.md](08-m7-everywhere/step-04-remote-access-and-auth.md) | 1.5 d | ⬜ | | | | |
 | M7-05 | Multi-host | [step-05-multi-host.md](08-m7-everywhere/step-05-multi-host.md) | 2.5 d | ⬜ | | | | |
 | M7-06 | `orch` CLI | [step-06-orch-cli.md](08-m7-everywhere/step-06-orch-cli.md) | 2 d | ⬜ | | | | |
-| M7-07 | Cloud-session aggregation (optional) | [step-07-cloud-session-aggregation-optional.md](08-m7-everywhere/step-07-cloud-session-aggregation-optional.md) | 1 d | ⬜ | | | | |
+| M7-07 | Cloud-session aggregation (optional, P3) | [step-07-cloud-session-aggregation-optional.md](08-m7-everywhere/step-07-cloud-session-aggregation-optional.md) | 1 d | ⬜ | | | | |
 
 ### M8 — Customization & skills
 Folder: `09-m8-customization-skills/` · [README](09-m8-customization-skills/README.md)
@@ -180,7 +180,7 @@ Folder: `11-m10-ecosystem-launch/` · [README](11-m10-ecosystem-launch/README.md
 |---|---|---|---|---|---|---|---|---|
 | M10-01 | Repair Agent (ladder 3) | [step-01-repair-agent-ladder-3.md](11-m10-ecosystem-launch/step-01-repair-agent-ladder-3.md) | 4 d | ⬜ | | | | |
 | M10-02 | Community drift loop | [step-02-community-drift-loop.md](11-m10-ecosystem-launch/step-02-community-drift-loop.md) | 2 d | ⬜ | | | | |
-| M10-03 | Plugin/skill/playbook registry | [step-03-plugin-skill-playbook-registry.md](11-m10-ecosystem-launch/step-03-plugin-skill-playbook-registry.md) | 3 d | ⬜ | | | | |
+| M10-03 | Plugin / skill / playbook registry | [step-03-plugin-skill-playbook-registry.md](11-m10-ecosystem-launch/step-03-plugin-skill-playbook-registry.md) | 3 d | ⬜ | | | | |
 | M10-04 | Kimi adapter | [step-04-kimi-adapter.md](11-m10-ecosystem-launch/step-04-kimi-adapter.md) | 2.5 d | ⬜ | | | | |
 | M10-05 | OpenCode adapter | [step-05-opencode-adapter.md](11-m10-ecosystem-launch/step-05-opencode-adapter.md) | 2.5 d | ⬜ | | | | |
 | M10-06 | Docs site | [step-06-docs-site.md](11-m10-ecosystem-launch/step-06-docs-site.md) | 2.5 d | ⬜ | | | | |

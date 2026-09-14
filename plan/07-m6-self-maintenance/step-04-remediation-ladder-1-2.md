@@ -4,7 +4,7 @@
 |---|---|
 | Milestone | M6 — Self-maintenance |
 | Status | ⬜ Not started |
-| Depends on | M6-02 (RepairCase, DriftClassifier), M6-03 (registry client, `ManifestOverrideApplier`), M4-03 (reroute), M1-02 (SessionSupervisor) |
+| Depends on | M6-02, M6-03, M4-03, M1-02, M5-05 |
 | Estimated effort | 3 days |
 | Packages touched | `packages/core`, `apps/daemon`, `apps/cli`, `packages/sdk` |
 | Risk | High |

@@ -4,7 +4,7 @@
 |---|---|
 | Milestone | M7 — Everywhere |
 | Status | ⬜ Not started |
-| Depends on | M7-04 (device tokens, origin rules, remote recipes), M0-06 (WS gateway, snapshot+delta), M5-05 (`sinceEventId` resubscribe), M1-10 (Fleet), M1-11 (Attention), M7-06 (`--host` flag conventions — do M7-06 first if both lanes are free) |
+| Depends on | M7-04, M0-06, M5-05, M1-10, M1-11, M7-06 |
 | Estimated effort | 2.5 days |
 | Packages touched | `apps/web` (host registry store, per-host clients, host switcher, merged Attention/Fleet), `apps/daemon` (`hosts` identity endpoint, `GET /api/v1/hosts/me` enrichment, worktree claim advisory), `packages/sdk` (host DTOs, multi-host client), `packages/ui` (host badge), `apps/desktop` (tray aggregation) |
 | Risk | Medium (a UI-side fan-out; the failure mode is confusion, not data loss) |

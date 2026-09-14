@@ -39,13 +39,13 @@ After M4 Orchestra knows, for every enabled provider, how much of each vendor qu
 
 | ID | File | Title | Effort | Depends on |
 |---|---|---|---|---|
-| M4-01 | [step-01-quota-signals-and-windows.md](step-01-quota-signals-and-windows.md) | Quota signals & windows | 2.5 d | M1-08, M2-03 |
-| M4-02 | [step-02-quotaforecaster.md](step-02-quotaforecaster.md) | QuotaForecaster | 2 d | M4-01 |
-| M4-03 | [step-03-rate-limit-cooling-and-reroute.md](step-03-rate-limit-cooling-and-reroute.md) | Rate-limit cooling & reroute | 2.5 d | M4-02, M2-04 |
-| M4-04 | [step-04-budgets-and-reserves.md](step-04-budgets-and-reserves.md) | Budgets & reserves | 2 d | M4-02 |
-| M4-05 | [step-05-lead-handoff.md](step-05-lead-handoff.md) | Lead handoff | 2 d | M4-04, M3-02 |
-| M4-06 | [step-06-dry-run-simulation.md](step-06-dry-run-simulation.md) | Dry-run simulation | 1.5 d | M4-02, M3-08 |
-| M4-07 | [step-07-fleet-windows-forecast-ui-and-kpis.md](step-07-fleet-windows-forecast-ui-and-kpis.md) | Fleet windows/forecast UI & KPIs | 1.5 d | M4-02 |
+| M4-01 | [step-01](step-01-quota-signals-and-windows.md) | Quota signals & windows | 2.5 d | M1-08, M2-03 |
+| M4-02 | [step-02](step-02-quotaforecaster.md) | QuotaForecaster | 2 d | M4-01 |
+| M4-03 | [step-03](step-03-rate-limit-cooling-and-reroute.md) | Rate-limit cooling & reroute | 2.5 d | M4-02, M2-04 |
+| M4-04 | [step-04](step-04-budgets-and-reserves.md) | Budgets & reserves | 2 d | M4-02, M3-02 |
+| M4-05 | [step-05](step-05-lead-handoff.md) | Lead handoff | 2 d | M4-04, M3-02 |
+| M4-06 | [step-06](step-06-dry-run-simulation.md) | Dry-run simulation | 1.5 d | M4-02, M3-08 |
+| M4-07 | [step-07](step-07-fleet-windows-forecast-ui-and-kpis.md) | Fleet windows/forecast UI & KPIs | 1.5 d | M4-02, M4-03, M4-04 |
 
 ## What you can test after this milestone
 
@@ -92,3 +92,6 @@ Preconditions: M1–M3 accepted; `tmux` running; `claude` and `codex` logged in 
 - **M4-05** is last (needs M4-04 and M3-02).
 - Fixture recording of real 429s cannot be scheduled; record them opportunistically whenever a real rate limit occurs during M1–M3 work and keep them under `fixtures/<cliVersion>/`.
 - Suggested order for one engineer: 01, 02, 07, 03, 04, 06, 05.
+
+## Revised release boundary (2026-09-15)
+Complete every required step above and its regression scenarios; optional gated steps do not block the milestone. [DEPENDENCIES.md](../DEPENDENCIES.md) gives the actual order. Capability-specific provider evidence, explicit recovery outcomes and commit-bound validation govern the exit criteria; no live result is implied by this plan update.

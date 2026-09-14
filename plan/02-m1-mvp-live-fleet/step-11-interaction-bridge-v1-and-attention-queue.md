@@ -4,7 +4,7 @@
 |---|---|
 | Milestone | M1 — MVP: Live fleet |
 | Status | ⬜ Not started |
-| Depends on | M1-05, M1-08 (M1-06/07 plug in as they land) |
+| Depends on | M1-05, M1-06, M1-08 |
 | Estimated effort | 4 days |
 | Packages touched | `packages/core` (AgentPrompt rules, PromptClassifier), `apps/daemon/src/application/prompts`, `apps/web` (Attention), `packages/ui` |
 | Risk | High (R5) |

@@ -4,14 +4,14 @@
 |---|---|
 | Milestone | M10 — Ecosystem & 1.0 |
 | Status | ⬜ Not started |
-| Depends on | M2-03 (full capability manifests); uses M1-02 (SessionSupervisor), M1-04 (BinaryRegistry), M1-08 (telemetry plane + fixture recorder), M1-11 (Interaction Bridge), M2-02 (model catalog + overrides), M4-01 (quota windows), M8-01 (layered settings) |
+| Depends on | M2-03, M1-02, M1-04, M1-08, M1-11, M2-02, M4-01, M8-01 |
 | Estimated effort | 2.5 days |
 | Packages touched | `packages/providers/opencode`, `packages/catalog/models/opencode`, `apps/daemon/src/infrastructure/binaries`, `apps/web` (Fleet + Models copy) |
 | Risk | Medium (R1 on the CLI surface; the multi-backend model story is the novel part) |
 | Owner | |
 
 ## 1. Goal
-`@orchestra/provider-opencode` (published as `orchestra-provider-opencode`) is **one adapter for every OpenAI-compatible backend** the user has already configured in the OpenCode CLI — DeepSeek, a local Ollama/vLLM endpoint, an enterprise gateway, anything the CLI itself supports. It implements the full `ProviderAdapter` over official surfaces: a quota-free `AuthProbe` that reports whether the CLI considers itself configured (never reading or echoing an API key), a `Launcher` for interactive PTY sessions and documented headless/JSON runs with hooks and MCP configured per worktree, a `TelemetryParser` for hook payloads, structured output and local logs, a `RateLimitParser` for 429/quota responses surfaced by the CLI, a `PaneController` with typed commands, model switch and prompt answering, and a manifest pinned to a recorded CLI version with fixtures. The available **models come from the user's own OpenCode configuration and from Orchestra's catalog layer — never from a vendor API call** (C2): Orchestra reads the CLI's config file and/or its documented "list models" command, presents the result as selectable models with per-backend cost tiers the user sets, and routes to them through the normal assignment engine. Goose is documented as the alternate CLI for the same niche and deliberately not implemented.
+`@orchestra/provider-opencode` (published as `orchestra-provider-opencode`) is **one adapter for every OpenAI-compatible backend** the user has already configured in the OpenCode CLI — DeepSeek, a local Ollama/vLLM endpoint, an enterprise gateway, anything the CLI itself supports. It implements the full `ProviderAdapter` over official surfaces: a quota-free `AuthProbe` that reports whether the CLI considers itself configured (never reading or echoing an API key), a `Launcher` for interactive PTY sessions and documented headless/JSON runs with hooks and MCP configured per worktree, a `TelemetryParser` for hook payloads, structured output and local logs, a `RateLimitParser` for 429/quota responses surfaced by the CLI, a `PaneController` with typed commands, model switch and prompt answering, and a manifest pinned to a recorded CLI version with fixtures. The available **models come from the user's own OpenCode configuration and from Orchestra's catalog layer — never from a vendor API call** (C2): Orchestra uses a verified credential-free provider projection or its documented list-models command, presents the result as selectable models with per-backend cost tiers the user sets, and routes to them through the normal assignment engine. Goose is documented as the alternate CLI for the same niche and deliberately not implemented.
 
 ## 2. Why
 - **D5** — "adding Kimi/DeepSeek/next thing = one package"; this is the package that covers *the entire long tail* of API-backed models with a single adapter instead of one per vendor.
@@ -25,7 +25,7 @@
 ### In scope
 - Package scaffold `packages/providers/opencode/` (`src/`, `manifest.json`, `fixtures/<cliVersion>/`, `README.md`, `orchestra.plugin.json` per M10-03).
 - `OpenCodeAuthProbe`, `OpenCodeLauncher`, `OpenCodeTelemetryParser`, `OpenCodeRateLimitParser`, `OpenCodePaneController`, optional `OpenCodeQuotaProbe`.
-- **Backend & model discovery from user configuration**: a `ModelSource` resolver that merges (a) the OpenCode config file(s) declared in `manifest.paths`, (b) the CLI's documented list-models command if one exists, and (c) Orchestra's `opencode.backends` settings block — with precedence, hot reload on file change, and a clear provenance label per model in the UI.
+- **Backend & model discovery from user configuration**: a `ModelSource` resolver that merges (a) a documented credential-free provider projection, (b) the CLI's documented list-models command if one exists, and (c) Orchestra's `opencode.backends` settings block — with precedence, hot reload on file change, and a clear provenance label per model in the UI.
 - Per-backend cost tier, context window and capability dimensions authored by the user (or shipped as a `model-catalog` artifact via M10-03) so the assignment engine can score them.
 - Fixture recording against at least two backends (one hosted, one local) + `RECORDED.md`; contract tests; parser fuzz.
 - `BinaryRegistry` entry, `features.providers.opencode` flag (default off), Fleet + Models UI copy (EN + AR).
@@ -47,14 +47,14 @@ No new core entities. One value object local to the adapter and the catalog:
 export interface OpenCodeBackend {
   id: string;                     // user-chosen, stable, e.g. 'deepseek', 'local-vllm'
   label: string;
-  source: 'opencode-config' | 'cli-list' | 'orchestra-settings';   // provenance, shown in the UI
+  source: 'provider-projection' | 'cli-list' | 'orchestra-settings';   // provenance, shown in the UI
   models: { id: string; label?: string; contextWindow?: number; costTier?: 1|2|3|4|5 }[];
   windowKind: 'none' | 'daily' | 'tokens';   // usually 'none' for pay-as-you-go keys
   configured: boolean;            // as reported by the CLI; NEVER derived from reading a key
 }
 ```
 Rules (pure, unit-tested):
-- **B1 No key ever crosses the boundary.** The resolver reads configuration files for *model and backend names only*; any value whose key matches `/key|token|secret|authorization|password/i` is dropped before the object is constructed, and a contract test asserts the resolved object serialises without a secret-shaped field.
+- **B1 No credential-store reads.** Do not read OpenCode config files that may contain secrets, even if a later filter would discard them. Use a documented credential-free CLI/local-server projection or manually supplied non-secret Orchestra model metadata. If no safe projection exists, disable discovery and explain manual metadata entry.
 - **B2 Provenance precedence.** `orchestra-settings` > `cli-list` > `opencode-config`; a model present in several sources keeps the highest-precedence metadata and lists all sources. Conflicting ids are never merged silently — the UI shows both origins.
 - **B3 Unknown capability is unknown.** A model with no authored profile gets `dimensions` from the catalog default for its declared family or, failing that, a neutral profile flagged `unrated`; `unrated` models are selectable manually but the assignment engine never *prefers* them (score multiplier caps at the lowest rated peer) until outcomes exist (M8-06).
 - **B4 No invented windows.** `windowKind: 'none'` ⇒ no forecast is shown; the Fleet card says "pay-as-you-go, no window" rather than an estimate. Only a 429 with a parsable reset produces a cooling period (C5).
@@ -76,9 +76,9 @@ export const openCodeAdapter: ProviderAdapter = {
 
 // Dynamic model discovery — the one place this adapter differs from claude/codex/agy/kimi
 export interface ModelSource {
-  /** Reads declared config paths + the documented list command. No network. No secrets. */
+  /** Reads only a verified safe projection or manual metadata; no credential-store reads. */
   discover(ctx: HostContext): Promise<Result<OpenCodeBackend[], AdapterError>>;
-  /** fs.watch on the declared config paths; debounced; emits on change so Models/Fleet update live. */
+  /** fs.watch on Orchestra metadata paths; debounced; emits on change so Models/Fleet update live. */
   watch(ctx: HostContext, onChange: () => void): () => void;
 }
 // The manifest declares `models: []` and `features: [... 'dynamicModels']`; M2-03's manifest schema treats an
@@ -86,28 +86,7 @@ export interface ModelSource {
 // adapter for its model list at session start and on change. Contract spec `manifest.contract.spec` enforces this.
 ```
 Manifest excerpt (shapes fixed by the SDK schema; every "(verify)" value is confirmed against the OpenCode docs and the installed CLI at step start):
-```jsonc
-{
-  "provider": "opencode",
-  "manifestVersion": "1.0.0",
-  "cliVersionRange": ">=<recorded major.minor> <next major>",      // (verify)
-  "fixturesVersion": "<cliVersion>",
-  "models": [],                                                     // dynamic — see ModelSource
-  "limits": { "maxConcurrentSessions": 4, "windows": [], "resume": true, "fork": false },   // (verify)
-  "features": ["hooks", "mcp", "dynamicModels", "streamJsonInput"], // (verify)
-  "sandboxProfiles": [ /* OpenCode's own approval/permission modes (verify) */ ],
-  "commands": [ /* native commands + workspace discovery (verify) */ ],
-  "promptProtocol": {
-    "permission":   { "source": "hook:<tool-use hook>", "answerTransport": "hook-response", "fallback": "send-keys-acked", "deadlineMs": 60000 },
-    "question":     { "source": "hook:<ask hook>",      "answerTransport": "hook-response", "fallback": "send-keys-acked" },
-    "planApproval": { "source": "hook:<plan hook>",     "answerTransport": "hook-response", "fallback": "send-keys-acked" },
-    "login":        { "source": "process:stderr",       "answerTransport": "none" }
-  },
-  "headless": { "flags": ["<documented headless flag>"], "outputFormat": "json" },          // (verify)
-  "paths": { "instructionFile": "<AGENTS.md or equivalent>", "commandsDir": "<...>", "hooksConfig": "<...>", "mcpConfig": "<...>", "configFile": "<opencode config path>" },  // (verify)
-  "updateSources": { "releases": "<GitHub releases URL>", "changelog": "<...>", "docs": "<...>" }
-}
-```
+No illustrative hook/permission manifest is normative. Populate the SDK capability schema from the chosen version-pinned protocol, with every operation initially `unverified`; disable unsupported operations.
 ### 4.3 Data / schema changes
 - `opencode` added to the `ProviderId` union (`packages/sdk`).
 - Settings block `opencode.backends` (M8-01 layered, user/workspace/org): `{ id, label, models: [{ id, contextWindow?, costTier? }], windowKind }[]` — metadata only; a Zod refinement rejects any property that looks like a credential (B1).
@@ -117,9 +96,9 @@ Manifest excerpt (shapes fixed by the SDK schema; every "(verify)" value is conf
 
 ### 4.4 Infrastructure (tmux, git, fs, network, external processes)
 - **Binary**: `opencode` added to `BinaryRegistry` with a version range and the documented `--version` parse; absent ⇒ provider `unavailable` with an install hint, never auto-installed (C1).
-- **Network from Orchestra: none.** The adapter has no HTTP client, imports no `fetch`/`undici`, and the `no-vendor-endpoints` rule plus the M0-08 egress test are extended with a job asserting that a full OpenCode session (against a *local* stub backend in CI) produces zero outbound sockets **from the daemon**. The CLI's own traffic is the user's own configured endpoint and is none of Orchestra's business (D4).
-- **Config reading**: the resolver reads only the paths declared in `manifest.paths.configFile` (plus Orchestra's own settings). Reads are size-capped, parsed with a tolerant parser inside a `Result`, and immediately projected through B1's secret filter. Files are never written by the resolver; the launcher's `preLaunchFiles` writes hooks/MCP config into the **worktree** only, deep-merged with backup (same rule as M1-05).
-- **Hooks**: the bundled dependency-free `bin/orch-hook.mjs` pattern — stdin JSON → `POST $ORCH_HOOK_URL/opencode/$ORCH_SESSION_ID/<hook>` → stdout response → non-blocking exit when the daemon is down. Hook names and response semantics come from the recorded fixtures **(verify against OpenCode hooks docs at step start)**.
+- **Network:** allow only the owned authenticated local OpenCode server control endpoint. Upstream model calls remain exclusively in the official CLI. Egress tests prove no direct upstream daemon traffic.
+- **Model discovery:** verify the credential-free projection before use. No direct vendor configuration reads or raw secret-bearing configuration responses; watch only Orchestra metadata and safe provider model events.
+- **Telemetry/control:** use the selected server API and its versioned event/permission schema; hooks are not assumed to exist.
 - **Env allowlist**: `PATH`, `HOME`, `TERM`, `LANG` plus the backend-selection variables the manifest names. Credential variables are passed through **only** if the CLI requires them and the user has them in their own environment — the daemon never sets, reads back, logs or persists their values, and the redacting serializer covers them.
 - **Local backends**: a local endpoint (Ollama/vLLM on `127.0.0.1`) is the recommended CI/demo configuration because it needs no key and no external network; the fixture-recording script defaults to it.
 - **Rate limits**: OpenAI-compatible 429 bodies/headers surfaced by the CLI in its structured output are parsed into a `RateLimitSignal`; `Retry-After`-style hints map to `retryAfterMs` with `confidence: 'official'`, anything inferred is `estimate` (R6 pattern).
@@ -151,6 +130,9 @@ permission round-trip   (identical shape to every other provider — D14)
 429 from the backend, surfaced by the CLI
   → RateLimitParser → RateLimitSignal → M4-03 cooling until resetAt → one reroute to the next candidate
 ```
+
+### 4.7 Review reconciliation contract (2026-09-15)
+Assess the official local server API for sessions, messages, events and permission responses first. Permit authenticated local control traffic to the verified provider process; this is distinct from calling upstream model endpoints. Restrict endpoint discovery to the owned local session and reject arbitrary remote URLs. One adapter does not imply identical capabilities across configured backends. Record provider/version/mode/backend identity, source retrieval date, fixtures, limitations and acceptance outcomes in foundation 14. Contract success never establishes live vendor compatibility.
 
 ## 5. Tasks
 - [ ] Verify the OpenCode surface against its docs and the installed CLI: hook names + payloads, headless/JSON flags, config file location and schema, list-models command (if any), permission/approval modes, MCP config path, `--version` output, 429 surfacing. Record findings in `README.md` and the step log **before** writing code.
@@ -206,7 +188,13 @@ permission round-trip   (identical shape to every other provider — D14)
 | TC-M10-05-11 | **Negative: CLI version outside the manifest range** | 1. Pin `cliVersionRange` to exclude the installed version. 2. Restart; open Health. | Commands marked *unverified*; `manifest-stale` RepairCase within 60 s; start-session warns | ⬜ |
 | TC-M10-05-12 | Cross-vendor review with an API-backed author | 1. Run a small mission where an opencode model implements and a subscription CLI reviews. | Reviewer provider ≠ opencode; findings route back; round completes; routing decision lists cost-tier reasoning | ⬜ |
 
+### 6.3 Review regression scenarios
+- [ ] An unsupported prompt kind disables only that feature.
+- [ ] Real protocol fixtures drive positive/negative permission tests.
+- [ ] Backend/model change cannot inherit an unverified capability.
+
 ## 7. Acceptance criteria (Definition of Done)
+- [ ] The review reconciliation contract and all §6.3 regression scenarios pass; archive evidence alongside the original test cases.
 - [ ] All seven contract specs green on fixtures recorded from **two** different backends; `RECORDED.md` names the CLI version, both backends, date and redaction.
 - [ ] The daemon makes zero outbound connections during a full OpenCode session (IT-02, TC-01) — the adapter contains no HTTP client at all.
 - [ ] No API key, token or credential-shaped string exists anywhere in the DB, logs, recordings, API responses or argv (TC-02, UT-01, UT-07).

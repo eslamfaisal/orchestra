@@ -4,8 +4,8 @@
 |---|---|
 | Milestone | M1 — MVP: Live fleet |
 | Status | ⬜ Not started |
-| Depends on | M1-02, M1-04 (∥ with M1-05) |
-| Estimated effort | 4 days |
+| Depends on | M0-09, M1-02, M1-04 |
+| Estimated effort | 5 days |
 | Packages touched | `packages/providers/codex`, `apps/daemon/src/infrastructure/rpc` (JSON-RPC over stdio client) |
 | Risk | High (R3: app-server experimental) |
 | Owner | |
@@ -21,7 +21,7 @@ D4/D5, ADR-009, C1/C3/C8, G1/G3, `05-provider-contract.md` §3 row "Codex".
 - Manifest v0: models (GPT-5.x family ids as reported by `codex` "(verify)"), features `appServer hooks? mcp sandbox nativeReview` "(verify hooks availability)", sandbox profiles `read-only | workspace-write | danger-full-access` (the last never auto-selected), prompt protocol (approvals → `app-server-rpc`), headless (`exec --json --output-schema`), `cliVersionRange` pinned to the reinstalled version, `updateSources`.
 - Two session modes decided per launch:
   - **managed** (default for delegated tasks): tmux pane runs `codex app-server`; daemon connects to its stdio through a tiny bridge (`orch-stdio-bridge.mjs`: pane process ↔ Unix socket) so the pane remains attachable and the RPC stream is structured; the daemon's `JsonRpcClient` sends `thread/start`, `turn/start`, receives item/approval/usage notifications "(verify method names via `generate-json-schema`)".
-  - **interactive** (user-driven): plain `codex` TUI in the pane; telemetry limited to process exit + optional hooks; prompts fall back to `send-keys-acked`.
+  - **interactive** (user-driven): plain `codex` TUI in the pane; telemetry limited to process exit + optional hooks; unsupported structured prompts are manual-only.
 - `Launcher.headless`: `codex exec --json --output-schema <schema.json> --sandbox <profile> --model … "<goal>"` in the worktree; stdout JSONL parsed.
 - `TelemetryParser`: app-server notifications → `message`, `tool_call/result`, `usage` (with token counts), `prompt_opened` (approvals with command/patch payloads), `model_switched`, `exit`; `exec --json` events likewise.
 - `RateLimitParser`: RPC error objects / stderr 429 / usage-limit messages → `RateLimitSignal`.
@@ -49,7 +49,7 @@ Bridge: `orch-stdio-bridge.mjs <socketPath> -- codex app-server` runs in the tmu
 ### 4.3 Data / schema changes
 `sessions.mode` column (migration `0006_sessions_mode.ts`).
 ### 4.4 Infrastructure
-Unix socket per managed session; reconnect after daemon restart (socket persists while the pane lives) — enables M5-05 restore. RPC ids correlate to `AgentPrompt.externalId`.
+Unix socket per managed session; reconnect only after the M0-09 experiment verifies provider request retention and gateway buffering; socket existence alone does not establish restore. RPC ids correlate to `AgentPrompt.externalId`.
 ### 4.5 API / UI surface
 Start-session dialog exposes `mode` (M1-10). No new routes.
 ### 4.6 Flow (approval round-trip)
@@ -57,6 +57,9 @@ Start-session dialog exposes `mode` (M1-10). No new routes.
 turn/start → … notification item/… requestApproval{id, command} → parser → prompt_opened(permission, transport app-server-rpc)
 AnswerPrompt → CodexAppServer.approve(id,'approve') → RPC response → Codex runs command → item notifications → tool_result → turn.completed{usage} → usage event
 ```
+
+### 4.7 Review reconciliation contract (2026-09-15)
+Derive method names, server-request shapes and usage fields from the installed CLI schema; abstract names in this plan are not wire protocol guarantees. Managed panes display a read-only mirrored transcript; raw terminal input is disabled for the app-server stream. Interactive TUI is a distinct mode with its own capability matrix. Capability state for resume/model switch/approval depends on exact version and mode. Retain pending server requests in a durable gateway if downtime capture is advertised; otherwise classify loss explicitly.
 
 ## 5. Tasks
 - [ ] Reinstall Codex (ENVIRONMENT.md); record version; run `codex app-server generate-json-schema` → fixture.
@@ -93,16 +96,21 @@ AnswerPrompt → CodexAppServer.approve(id,'approve') → RPC response → Codex
 | TC-M1-06-06 | Schema drift check | 1. `orch dev codex schema-diff` | "no drift" for pinned version; after a CLI upgrade shows diff summary | ⬜ |
 | TC-M1-06-07 | Restart survives | 1. managed session mid-turn 2. restart daemon | daemon reconnects to socket; next notifications flow; session still `running` | ⬜ |
 
+### 6.3 Review regression scenarios
+- [ ] Managed transcript is labelled and cannot receive arbitrary PTY keystrokes.
+- [ ] Server request IDs are scoped to connection/session generation.
+- [ ] Switch to exec with pending approval requires explicit reconciliation and a new execution.
+
 ## 7. Acceptance criteria
-- [ ] Managed (app-server), interactive and headless modes work on the real CLI.
+- [ ] The M0-09 selected managed mode works on the real CLI; other modes ship only with their own evidence profile.
 - [ ] Approvals round-trip via RPC; deny path verified.
 - [ ] Schema fixture pinned; drift check tool exists.
 - [ ] Contract suite + fuzz green; `RECORDED.md` complete.
-- [ ] Daemon restart re-attaches to the managed session socket.
+- [ ] Restart either demonstrably reattaches with correct request state or reports transport_lost with manual recovery.
 - [ ] All TC pass; no new lint/arch violations.
 
 ## 8. Risks / open questions
-- App-server method names/shape evolve (experimental): everything derived from the schema fixture; `exec --json` is the fallback transport (M6-04 ladder step).
+- App-server method names/shape evolve (experimental): everything derived from the schema fixture; `exec --json` is a separately evidenced new execution mode, never a seamless fallback for a pending app-server request.
 - Bridge adds a moving part; alternative is running app-server as a daemon child (not in tmux) — rejected for MVP to keep "everything attachable" (D2); revisit in ADR if the bridge proves flaky.
 
 ## 9. Notes & progress log

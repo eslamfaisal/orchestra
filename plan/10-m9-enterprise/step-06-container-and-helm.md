@@ -207,7 +207,7 @@ Pod replacement terminates its agent processes even when worktree data persists.
 - [ ] Values for Postgres/S3/OIDC/audit sinks/observability/providers/ingress/resources/security contexts; `values-kind.yaml` and `values-single.yaml` examples.
 - [ ] Evaluation subcharts (`postgresql`, `minio`) behind `postgres.enabled` / `s3.enabled` with a NOTES warning that they are not production storage.
 - [ ] Vendor-CLI mounting: `providers.binaries` rendering, optional initContainer, docs for all three patterns plus the one-time `claude login` procedure.
-- [ ] `helm-smoke.yml` CI job: kind cluster, build image, `helm install` with FakeProvider, wait Ready, run a scripted session, `kubectl delete pod`, assert Ready + zero lost prompts.
+- [ ] `helm-smoke.yml` CI job: kind cluster, build image, `helm install` with FakeProvider, wait Ready, run a scripted session, `kubectl delete pod`, assert Ready + durable captured prompts with explicit recovery outcomes.
 - [ ] `helm lint`, `helm template` golden-output tests, and `kubeconform` schema validation in CI.
 - [ ] Commented-out `networkpolicy.yaml` sample (egress to DB, S3, IdP, SIEM, OTLP only) for M9-09 to finish.
 - [ ] Docs `docs/deployment/docker.md` and `docs/deployment/kubernetes.md` (R-C1/R-C2 stated up front, sizing, upgrade procedure, backup pointer to M9-05, troubleshooting table).

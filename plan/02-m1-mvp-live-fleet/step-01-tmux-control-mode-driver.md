@@ -5,7 +5,7 @@
 | Milestone | M1 — MVP: Live fleet |
 | Status | ⬜ Not started |
 | Depends on | M0-04 |
-| Estimated effort | 3.5 days |
+| Estimated effort | 3 days |
 | Packages touched | `apps/daemon/src/infrastructure/tmux`, `apps/daemon/src/application/ports` |
 | Risk | High (R2) |
 | Owner | |

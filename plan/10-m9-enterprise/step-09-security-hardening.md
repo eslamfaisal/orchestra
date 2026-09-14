@@ -4,7 +4,7 @@
 |---|---|
 | Milestone | M9 — Enterprise |
 | Status | ⬜ Not started |
-| Depends on | M9-03 |
+| Depends on | M9-03, M9-02 |
 | Estimated effort | 2 days |
 | Packages touched | `packages/core` (`src/redaction/`), `packages/sdk` (`fixtures/secrets-corpus/`), `apps/daemon` (`src/infrastructure/crypto`, `src/infrastructure/persistence`, `src/interface/http/security`, `src/application/history`), `apps/web` (CSP compliance, no inline handlers), `deploy/helm/orchestra` (NetworkPolicy, securityContext), `docs/security` (threat model, pen-test checklist), `.github/workflows` (SBOM/dep review) |
 | Risk | High (this step's output is the security claim the project makes publicly) |

@@ -4,7 +4,7 @@
 |---|---|
 | Milestone | M6 — Self-maintenance |
 | Status | ⬜ Not started |
-| Depends on | M6-04 (attempts + metrics), M6-01 (doctor), M6-02 (cases), M6-03 (registry), M6-05 (updates/canary), M6-06 (lifecycle), M0-07 (web shell) |
+| Depends on | M6-04, M6-01, M6-02, M6-03, M6-05, M6-06, M0-07 |
 | Estimated effort | 2 days |
 | Packages touched | `apps/web`, `packages/ui`, `apps/daemon`, `packages/core`, `apps/cli` |
 | Risk | Medium |

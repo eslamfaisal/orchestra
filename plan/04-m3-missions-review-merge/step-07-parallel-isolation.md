@@ -4,7 +4,7 @@
 |---|---|
 | Milestone | M3 — Missions, review & merge |
 | Status | ⬜ Not started |
-| Depends on | M1-03 ∥ (may start any time after M1-03; integrates with M3-03) |
+| Depends on | M1-03, M3-03 |
 | Estimated effort | 1.5 days |
 | Packages touched | `packages/core` (allocation rules), `apps/daemon` (application/isolation, infrastructure/net, infrastructure/git, interface/http), `packages/sdk` (FakeProvider scenario), `apps/web` (Terminals/Board badges) |
 | Risk | Medium |

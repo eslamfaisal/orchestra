@@ -4,7 +4,7 @@
 |---|---|
 | Milestone | M10 — Ecosystem & 1.0 |
 | Status | ⬜ Not started |
-| Depends on | — (no code dependency; finishes the M0-08 supply-chain baseline and M7-02's signing work). Blocks M10-06's production deploy and M10-08's launch. |
+| Depends on | M0-08, M7-02 |
 | Estimated effort | 2 days |
 | Packages touched | repo root (`LICENSE`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md`, `GOVERNANCE.md`, `CODEOWNERS`), `.github/**`, `docs/adr`, `tools/release`, every publishable `package.json` |
 | Risk | High (a wrong licence or an uncleared name is expensive to undo after 1.0) |

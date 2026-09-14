@@ -5,7 +5,7 @@
 | Milestone | M9 — Enterprise |
 | Status | ⬜ Not started |
 | Depends on | M8-01 |
-| Estimated effort | 3.5 days |
+| Estimated effort | 3 days |
 | Packages touched | `packages/core` (`src/auth/`), `apps/daemon` (`src/core/auth`, `src/application/auth`, `src/infrastructure/persistence`, `src/interface/http`, `src/interface/ws`, `src/interface/mcp`), `apps/web` (Settings → Users & roles, permission-aware UI), `apps/cli`, `packages/sdk` (types only) |
 | Risk | High (touches every mutating handler) |
 | Owner | |

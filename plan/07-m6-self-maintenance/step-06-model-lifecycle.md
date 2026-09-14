@@ -4,7 +4,7 @@
 |---|---|
 | Milestone | M6 — Self-maintenance |
 | Status | ⬜ Not started |
-| Depends on | M6-03 (registry/catalog delivery), M2-02 (model catalog & profiles), M2-04 (assignment engine), M2-09 (routing policy file) |
+| Depends on | M6-03, M2-02, M2-04, M2-09 |
 | Estimated effort | 1.5 days |
 | Packages touched | `packages/core`, `packages/catalog`, `apps/daemon`, `apps/web`, `packages/ui`, `apps/cli` |
 | Risk | Medium |

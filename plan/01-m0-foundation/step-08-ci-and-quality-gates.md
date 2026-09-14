@@ -4,7 +4,7 @@
 |---|---|
 | Milestone | M0 — Foundation |
 | Status | ⬜ Not started |
-| Depends on | M0-01 (start), M0-03 (finish) |
+| Depends on | M0-01, M0-03 |
 | Estimated effort | 2 days |
 | Packages touched | `.github/workflows`, `tools/eslint-rules`, repo root docs |
 | Risk | Medium (these are security controls) |

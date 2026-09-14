@@ -4,8 +4,8 @@
 |---|---|
 | Milestone | M7 — Everywhere |
 | Status | ⬜ Not started |
-| Depends on | M7-05 (host registry & merged views), M2-03 (capability manifests v1), M1-04 (BinaryRegistry), M6-01 (Doctor probes) |
-| Estimated effort | 1 day |
+| Depends on | M7-05, M2-03, M1-04, M6-01 |
+| Estimated effort | 1 days |
 | Packages touched | `packages/sdk` (manifest `cloudSessions` block), `packages/providers/claude`, `packages/providers/codex`, `packages/providers/agy` (manifest additions + parsers + fixtures), `apps/daemon` (`src/application/cloud`, `src/infrastructure/cloud`), `apps/web` (Fleet "Cloud sessions" section), `docs/` |
 | Risk | Medium (vendor-surface availability is unknown until the step starts; the compliance line is easy to cross) |
 | Owner | |

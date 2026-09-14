@@ -4,7 +4,7 @@
 |---|---|
 | Milestone | M10 — Ecosystem & 1.0 |
 | Status | ⬜ Not started |
-| Depends on | M10-03 (artifact/plugin formats, `orch plugin check`, templates); uses M0-03 (`FakeProvider` + contract harness), M8-04 (skill format), M3-01 (playbook schema), M9-06 (container + Helm), M7-01/02 (desktop install), M10-07 (final name, license, URLs) |
+| Depends on | M10-03, M0-03, M8-04, M3-01, M9-06, M7-01, M7-02, M10-07 |
 | Estimated effort | 2.5 days |
 | Packages touched | `docs/`, `packages/sdk` (doc-generation entry points), `packages/ui` (RTL tokens reused), `.github/workflows/docs.yml`, `examples/` |
 | Risk | Medium (content volume; AR/RTL correctness; docs drifting from code) |

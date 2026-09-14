@@ -4,7 +4,7 @@
 |---|---|
 | Milestone | M4 — Quota, budgets, resilience |
 | Status | ⬜ Not started |
-| Depends on | M4-02 |
+| Depends on | M4-02, M4-03, M4-04 |
 | Estimated effort | 1.5 days |
 | Packages touched | `apps/web` (screens/fleet), `packages/ui`, `apps/daemon` (application/kpi, interface/http) |
 | Risk | Low |

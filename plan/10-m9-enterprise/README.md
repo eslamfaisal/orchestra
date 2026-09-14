@@ -41,15 +41,15 @@ After M9 a small team can run one `orchestrad` for everyone: users sign in throu
 
 | ID | Step file | Title | Effort | Depends on |
 |---|---|---|---|---|
-| M9-01 | [step-01-rbac.md](step-01-rbac.md) | RBAC | 3 d | M8-01 |
-| M9-02 | [step-02-oidc.md](step-02-oidc.md) | OIDC | 2 d | M9-01, M7-04 |
-| M9-03 | [step-03-immutable-audit-log-and-siem-export.md](step-03-immutable-audit-log-and-siem-export.md) | Immutable audit log & SIEM export | 2 d | M9-01 |
-| M9-04 | [step-04-approval-gates-4-eyes.md](step-04-approval-gates-4-eyes.md) | Approval gates (4-eyes) | 2 d | M9-01, M3-04 |
-| M9-05 | [step-05-postgres-s3-drivers.md](step-05-postgres-s3-drivers.md) | Postgres + S3 drivers | 3 d | M0-05 |
-| M9-06 | [step-06-container-and-helm.md](step-06-container-and-helm.md) | Container & Helm | 2.5 d | M9-05 |
-| M9-07 | [step-07-automations.md](step-07-automations.md) | Automations | 2.5 d | M3-02 |
-| M9-08 | [step-08-observability.md](step-08-observability.md) | Observability | 2 d | M0-04 |
-| M9-09 | [step-09-security-hardening.md](step-09-security-hardening.md) | Security hardening | 2 d | M9-03 |
+| M9-01 | [step-01](step-01-rbac.md) | RBAC | 3 d | M8-01 |
+| M9-02 | [step-02](step-02-oidc.md) | OIDC | 2 d | M9-01, M7-04 |
+| M9-03 | [step-03](step-03-immutable-audit-log-and-siem-export.md) | Immutable audit log & SIEM export | 2 d | M9-01 |
+| M9-04 | [step-04](step-04-approval-gates-4-eyes.md) | Approval gates (4-eyes) | 2 d | M9-01, M3-04 |
+| M9-05 | [step-05](step-05-postgres-s3-drivers.md) | Postgres + S3 drivers | 3 d | M0-05, M5-06, M9-04 |
+| M9-06 | [step-06](step-06-container-and-helm.md) | Container & Helm | 2.5 d | M9-05 |
+| M9-07 | [step-07](step-07-automations.md) | Automations | 2.5 d | M3-02, M4-04, M9-01, M9-04 |
+| M9-08 | [step-08](step-08-observability.md) | Observability | 2 d | M0-04, M9-03 |
+| M9-09 | [step-09](step-09-security-hardening.md) | Security hardening | 2 d | M9-03, M9-02 |
 
 ## What you can test after this milestone
 
@@ -96,3 +96,6 @@ Preconditions: M8 demo passes; Docker running; `kind`, `helm`, `kubectl` install
 - **Lane C (platform):** M9-07 (2.5 d) and M9-08 (2 d) can start on day 1; M9-07 must be re-checked against M9-01 guards and M9-04 gates once those land (one half-day integration task listed in M9-07).
 - Serial effort 21 d; with three lanes ≈ 9–10 calendar days plus a 1-day milestone acceptance pass running the demo script above.
 - Shared touch points to coordinate: `config.yaml` schema (M9-02, M9-05, M9-06, M9-08), `audit_log` schema (M9-03 writes it, M9-01/M9-04/M9-07 emit into it), `apps/daemon/src/infrastructure/egress/` allowlist (M9-02, M9-03, M9-05, M9-08).
+
+## Revised release boundary (2026-09-15)
+Complete every required step above and its regression scenarios; optional gated steps do not block the milestone. [DEPENDENCIES.md](../DEPENDENCIES.md) gives the actual order. Capability-specific provider evidence, explicit recovery outcomes and commit-bound validation govern the exit criteria; no live result is implied by this plan update.

@@ -1,10 +1,10 @@
-# Step M5-05 — Session restore with zero lost prompts
+# Step M5-05 — Session restore with durable captured prompts with explicit recovery outcomes
 
 | Field | Value |
 |---|---|
 | Milestone | M5 — History, recording, replay |
 | Status | ⬜ Not started |
-| Depends on | M1-11 (Interaction Bridge & Attention queue), M1-02 (SessionSupervisor), M1-01 (tmux control-mode driver), M1-08 (telemetry plane), M0-05 (event store), M0-06 (WS gateway) |
+| Depends on | M1-11, M1-02, M1-01, M1-08, M0-05, M0-06, M5-01 |
 | Estimated effort | 2.5 days |
 | Packages touched | `packages/core`, `packages/sdk`, `apps/daemon` (`src/application/restore`, `src/infrastructure/tmux`, `src/infrastructure/telemetry`, `src/interface/http`, `src/interface/ws`), `apps/web`, `packages/providers/claude`, `packages/providers/codex`, `packages/providers/agy` |
 | Risk | High |
@@ -14,7 +14,7 @@
 `kill -9` on `orchestrad` while an agent is waiting for a permission, question or plan approval no longer costs the user anything. On restart the daemon re-attaches to the `orchestra` tmux server, matches every live pane back to its `Session` row via `ORCH_SESSION_ID`, reconciles session states, replays the raw telemetry backlog it had persisted **before** parsing, re-derives the open `AgentPrompt`s, and pushes a snapshot + delta to every reconnecting UI. The same prompt id is answerable from the web seconds after restart, the agent continues, and the metric `restore_lost_prompts` reads `0`.
 
 ## 2. Why
-- 1.0 Definition of Done (`ROADMAP.md`, source plan §20): "restore with no lost prompts". `12-ux-principles.md` reliability budget: "Restore — re-attach tmux + replay events; zero lost prompts".
+- 1.0 Definition of Done (`ROADMAP.md`, source plan §20): "restore with no lost prompts". `12-ux-principles.md` reliability budget: "Restore — re-attach tmux + replay events; durable captured prompts with explicit recovery outcomes".
 - D2: tmux is the substrate precisely so that agents outlive the daemon; that promise is only real if the daemon can find them again and rebuild the interaction state.
 - D13: one `SessionSupervisor` owns all tmux state, so reconcile is a single, testable actor operation rather than a scattered recovery path.
 - D14: "every agent stop-and-ask becomes a durable `AgentPrompt`" — durable means it survives process death, including the window between an agent asking and the daemon persisting.

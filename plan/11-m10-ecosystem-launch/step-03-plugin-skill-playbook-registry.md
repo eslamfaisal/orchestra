@@ -4,7 +4,7 @@
 |---|---|
 | Milestone | M10 — Ecosystem & 1.0 |
 | Status | ⬜ Not started |
-| Depends on | M6-03 (signed envelopes, `TRUSTED_KEYS`, `EgressPolicy`, `HttpRegistryClient`), M8-04 (skill artifact format + trust levels), M8-01 (settings layers), M2-01/M2-02 (taxonomy + model catalog), M3-01 (playbook schema) |
+| Depends on | M6-03, M8-04, M8-01, M2-01, M2-02, M3-01 |
 | Estimated effort | 3 days |
 | Packages touched | `packages/sdk`, `packages/core`, `packages/catalog`, `apps/daemon`, `apps/web`, `apps/cli`, `docs/`, `.github/workflows` |
 | Risk | High (this is the code-loading path; R9) |

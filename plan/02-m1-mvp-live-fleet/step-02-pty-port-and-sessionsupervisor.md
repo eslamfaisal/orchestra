@@ -4,8 +4,8 @@
 |---|---|
 | Milestone | M1 — MVP: Live fleet |
 | Status | ⬜ Not started |
-| Depends on | M1-01, M0-04 (daemon single-instance lock, ADR-020) |
-| Estimated effort | 4 days |
+| Depends on | M1-01, M0-04 |
+| Estimated effort | 3 days |
 | Packages touched | `apps/daemon/src/application/sessions`, `apps/daemon/src/infrastructure/tmux`, `packages/sdk/bin` (`orch-run`), `packages/core` (Session invariants) |
 | Risk | High |
 | Owner | |

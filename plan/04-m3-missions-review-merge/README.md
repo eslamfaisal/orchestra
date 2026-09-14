@@ -4,7 +4,7 @@
 |---|---|
 | Folder | `plan/04-m3-missions-review-merge/` |
 | Steps | 9 (M3-01 … M3-09) |
-| Effort | ~22 working days |
+| Effort | 23 working days (sum of step estimates; optional work included) |
 | Entry gate | M2 acceptance ✅ (assignment engine + MCP delegation live on real CLIs) |
 | Feature flags | `features.missions`, `features.review`, `features.forge`, `features.isolation` (all default `false` until M3-09 passes) |
 | Exit tag | `mvp+` |
@@ -57,15 +57,15 @@ After M3 the unit of work stops being "a task" and becomes **a mission**. You de
 
 | ID | File | Title | Effort | Depends on |
 |---|---|---|---|---|
-| M3-01 | [step-01-playbook-schema-and-shipped-playbooks.md](step-01-playbook-schema-and-shipped-playbooks.md) | Playbook schema & shipped playbooks | 2 d | M2-01 |
-| M3-02 | [step-02-mission-lifecycle-and-lead-session.md](step-02-mission-lifecycle-and-lead-session.md) | Mission lifecycle & Lead session | 3 d | M3-01, M2-05 |
-| M3-03 | [step-03-task-contract-and-result-collection.md](step-03-task-contract-and-result-collection.md) | Task contract & result collection | 2 d | M3-02 |
-| M3-04 | [step-04-cross-vendor-review-rule-and-rounds.md](step-04-cross-vendor-review-rule-and-rounds.md) | Cross-vendor review rule & rounds | 3 d | M3-03 |
-| M3-05 | [step-05-review-and-merge-ui.md](step-05-review-and-merge-ui.md) | Review & Merge UI | 3 d | M3-04 |
-| M3-06 | [step-06-pr-integration.md](step-06-pr-integration.md) | PR integration | 2 d | M3-05 |
-| M3-07 | [step-07-parallel-isolation.md](step-07-parallel-isolation.md) | Parallel isolation | 1.5 d | M1-03 ∥ (lands before M3-03 runs in parallel) |
-| M3-08 | [step-08-missions-screen.md](step-08-missions-screen.md) | Missions screen | 3 d | M3-04 |
-| M3-09 | [step-09-e2e-feature-mission-acceptance.md](step-09-e2e-feature-mission-acceptance.md) | E2E feature mission acceptance | 2.5 d | all M3 |
+| M3-01 | [step-01](step-01-playbook-schema-and-shipped-playbooks.md) | Playbook schema & shipped playbooks | 2 d | M2-01 |
+| M3-02 | [step-02](step-02-mission-lifecycle-and-lead-session.md) | Mission lifecycle & Lead session | 3 d | M3-01, M2-05 |
+| M3-03 | [step-03](step-03-task-contract-and-result-collection.md) | Task contract & result collection | 2 d | M3-02 |
+| M3-04 | [step-04](step-04-cross-vendor-review-rule-and-rounds.md) | Cross-vendor review rule & rounds | 3 d | M3-03 |
+| M3-05 | [step-05](step-05-review-and-merge-ui.md) | Review & Merge UI | 4 d | M3-04 |
+| M3-06 | [step-06](step-06-pr-integration.md) | PR integration | 2 d | M3-05 |
+| M3-07 | [step-07](step-07-parallel-isolation.md) | Parallel isolation | 1.5 d | M1-03, M3-03 |
+| M3-08 | [step-08](step-08-missions-screen.md) | Missions screen | 3 d | M3-04 |
+| M3-09 | [step-09](step-09-e2e-feature-mission-acceptance.md) | E2E feature mission acceptance | 2.5 d | M3-01, M3-02, M3-03, M3-04, M3-05, M3-06, M3-07, M3-08 |
 
 ## What you can test after this milestone
 
@@ -124,3 +124,6 @@ Preconditions: M2 demo passes; `claude` and `codex` logged in; `gh auth status` 
 - Within M3-04, the three `FindingsExtractor` strategies are independent of the round state machine; the `REVIEW.md` extractor is enough to unblock the whole loop, with the structured-output ones added after.
 - M3-09's CI `mission-e2e` fixture can be written as soon as M3-04 lands and will catch regressions in M3-05..M3-08 while they are still being built.
 - Do **not** parallelize M3-02 with M3-01 (the playbook schema is M3-02's input) or M3-06 with M3-05 (the PR panel lives inside the merge panel).
+
+## Revised release boundary (2026-09-15)
+Complete every required step above and its regression scenarios; optional gated steps do not block the milestone. [DEPENDENCIES.md](../DEPENDENCIES.md) gives the actual order. Capability-specific provider evidence, explicit recovery outcomes and commit-bound validation govern the exit criteria; no live result is implied by this plan update.

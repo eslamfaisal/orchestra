@@ -4,7 +4,7 @@
 |---|---|
 | Milestone | M1 — MVP: Live fleet |
 | Status | ⬜ Not started |
-| Depends on | M1-05 (uses claude first; codex/agy plug in as they land) |
+| Depends on | M1-05 |
 | Estimated effort | 2.5 days |
 | Packages touched | `apps/daemon/src/interface/hooks`, `apps/daemon/src/application/telemetry`, `apps/cli` (`orch fixtures record`), `packages/sdk` (fixture tooling) |
 | Risk | Medium |

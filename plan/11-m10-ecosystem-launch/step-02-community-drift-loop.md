@@ -4,7 +4,7 @@
 |---|---|
 | Milestone | M10 — Ecosystem & 1.0 |
 | Status | ⬜ Not started |
-| Depends on | M6-02 (drift classifier, `RepairCase`), M6-03 (`EgressPolicy`, registry client, signed index); consumes M10-03 (registry endpoint + `stale` index field), M8-01 (settings layers), M8-08 (notification channels) |
+| Depends on | M6-02, M6-03, M10-03, M8-01, M8-08 |
 | Estimated effort | 2 days |
 | Packages touched | `packages/core`, `packages/sdk`, `apps/daemon`, `apps/web`, `apps/cli`, `docs/` |
 | Risk | High (privacy; this is the only feature that sends anything off the host) |
