@@ -1,0 +1,8 @@
+* @eslamfaisal
+/packages/core/ @eslamfaisal
+/packages/sdk/ @eslamfaisal
+/packages/providers/ @eslamfaisal
+/eslint.config.mjs @eslamfaisal
+/.dependency-cruiser.cjs @eslamfaisal
+/tools/eslint-rules/ @eslamfaisal
+/SECURITY.md @eslamfaisal

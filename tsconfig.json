@@ -1,0 +1,44 @@
+{
+  "files": [],
+  "references": [
+    {
+      "path": "packages/core"
+    },
+    {
+      "path": "packages/sdk"
+    },
+    {
+      "path": "packages/catalog"
+    },
+    {
+      "path": "packages/ui"
+    },
+    {
+      "path": "packages/providers/claude"
+    },
+    {
+      "path": "packages/providers/codex"
+    },
+    {
+      "path": "packages/providers/agy"
+    },
+    {
+      "path": "packages/providers/kimi"
+    },
+    {
+      "path": "packages/providers/opencode"
+    },
+    {
+      "path": "apps/daemon"
+    },
+    {
+      "path": "apps/web"
+    },
+    {
+      "path": "apps/desktop"
+    },
+    {
+      "path": "apps/cli"
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+node_modules/
+dist/
+coverage/
+.turbo/
+pnpm-lock.yaml
+# Preserve historical planning and agent configuration formatting.
+plan/
+.claude/
+CLAUDE.md
+astra-review-notes.md

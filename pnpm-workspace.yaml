@@ -1,0 +1,12 @@
+packages:
+  - apps/*
+  - packages/*
+  - packages/providers/*
+  - tools/eslint-rules
+
+# pnpm uses minutes: three days.
+minimumReleaseAge: 4320
+onlyBuiltDependencies:
+  - better-sqlite3
+  - node-pty
+  - esbuild

@@ -1,0 +1,25 @@
+{
+  "name": "@orchestra/provider-codex",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc --noEmit -p tsconfig.lint.json",
+    "lint": "eslint src tests",
+    "test": "vitest run --config ../../../vitest.config.ts --project @orchestra/provider-codex"
+  },
+  "dependencies": {
+    "@orchestra/sdk": "workspace:*"
+  }
+}

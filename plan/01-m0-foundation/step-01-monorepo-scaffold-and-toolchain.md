@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | Milestone | M0 — Foundation |
-| Status | ⬜ Not started |
+| Status | 🟨 In progress |
 | Depends on | — |
 | Estimated effort | 1.5 days |
 | Packages touched | repo root, `apps/*`, `packages/*` (empty shells), `tools/`, `.github/` |

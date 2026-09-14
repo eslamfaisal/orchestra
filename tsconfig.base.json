@@ -1,0 +1,62 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "verbatimModuleSyntax": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": false,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "composite": true,
+    "types": [],
+    "baseUrl": ".",
+    "paths": {
+      "@orchestra/core": [
+        "packages/core/src/index.ts"
+      ],
+      "@orchestra/sdk": [
+        "packages/sdk/src/index.ts"
+      ],
+      "@orchestra/catalog": [
+        "packages/catalog/src/index.ts"
+      ],
+      "@orchestra/ui": [
+        "packages/ui/src/index.ts"
+      ],
+      "@orchestra/provider-claude": [
+        "packages/providers/claude/src/index.ts"
+      ],
+      "@orchestra/provider-codex": [
+        "packages/providers/codex/src/index.ts"
+      ],
+      "@orchestra/provider-agy": [
+        "packages/providers/agy/src/index.ts"
+      ],
+      "@orchestra/provider-kimi": [
+        "packages/providers/kimi/src/index.ts"
+      ],
+      "@orchestra/provider-opencode": [
+        "packages/providers/opencode/src/index.ts"
+      ],
+      "orchestrad": [
+        "apps/daemon/src/index.ts"
+      ],
+      "@orchestra/web": [
+        "apps/web/src/index.ts"
+      ],
+      "@orchestra/desktop": [
+        "apps/desktop/src/index.ts"
+      ],
+      "orch": [
+        "apps/cli/src/index.ts"
+      ]
+    }
+  }
+}

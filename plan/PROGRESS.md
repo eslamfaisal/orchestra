@@ -15,7 +15,7 @@ Update rule: change **Status**, fill **Started/Done** (ISO dates), put test summ
 
 | Milestone | Steps | ⬜ | 🟨 | 🧪 | ✅ | ⛔ | Status | Target start | Target end | Actual end |
 |---|---|---|---|---|---|---|---|---|---|---|
-| M0 — Foundation | 9 | 9 | 0 | 0 | 0 | 0 | ⬜ | | | |
+| M0 — Foundation | 9 | 8 | 1 | 0 | 0 | 0 | 🟨 | | | |
 | M1 — MVP: Live fleet | 13 | 13 | 0 | 0 | 0 | 0 | ⬜ | | | |
 | M2 — Delegation & intelligence | 9 | 9 | 0 | 0 | 0 | 0 | ⬜ | | | |
 | M3 — Missions, review & merge | 9 | 9 | 0 | 0 | 0 | 0 | ⬜ | | | |
@@ -34,7 +34,7 @@ Folder: `01-m0-foundation/` · [README](01-m0-foundation/README.md)
 
 | Step | Title | File | Effort | Status | Started | Done | Tests | Notes |
 |---|---|---|---|---|---|---|---|---|
-| M0-01 | Monorepo scaffold & toolchain | [step-01-monorepo-scaffold-and-toolchain.md](01-m0-foundation/step-01-monorepo-scaffold-and-toolchain.md) | 1.5 d | ⬜ | | | | |
+| M0-01 | Monorepo scaffold & toolchain | [step-01-monorepo-scaffold-and-toolchain.md](01-m0-foundation/step-01-monorepo-scaffold-and-toolchain.md) | 1.5 d | 🟨 | 2026-09-15 | | | Monorepo scaffold in progress; existing plan changes preserved. |
 | M0-02 | Core domain package | [step-02-core-domain-package.md](01-m0-foundation/step-02-core-domain-package.md) | 2 d | ⬜ | | | | |
 | M0-03 | SDK, contract harness, FakeProvider | [step-03-sdk-contract-harness-fakeprovider.md](01-m0-foundation/step-03-sdk-contract-harness-fakeprovider.md) | 3 d | ⬜ | | | | |
 | M0-04 | Daemon skeleton | [step-04-daemon-skeleton.md](01-m0-foundation/step-04-daemon-skeleton.md) | 2.5 d | ⬜ | | | | |
@@ -215,6 +215,8 @@ Folder: `11-m10-ecosystem-launch/` · [README](11-m10-ecosystem-launch/README.md
 
 | 2026-09-15 | — | Continued feasibility revision: completed missing M0-09 spec, reconciled contracts/acceptance, added ADR-023 (Proposed), canonical KPI contract and generated dependency graph. All 92 implementation steps remain not started. |
 | 2026-09-15 | — | Plan verification: 92 files / 11 milestones / 0 structural issues; verifier regression suite 9/9. Estimate sums: 55.5 d required MVP, 215 d required roadmap, 219 d including optional integrations; no runtime evidence claimed. |
+
+| 2026-09-15 | M0-01 | Implementation started on feature/m0-01-monorepo-scaffold; Node 22/toolchain setup and architecture guardrails. |
 
 ## Feasibility and release gates still open
 

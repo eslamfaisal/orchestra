@@ -1,0 +1,12 @@
+node_modules/
+dist/
+coverage/
+.turbo/
+*.tsbuildinfo
+.orchestra/
+.env
+.env.*
+!.env.example
+.DS_Store
+*~
+*.log
