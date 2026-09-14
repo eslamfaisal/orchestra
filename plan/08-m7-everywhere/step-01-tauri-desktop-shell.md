@@ -4,8 +4,8 @@
 |---|---|
 | Milestone | M7 — Everywhere |
 | Status | ⬜ Not started |
-| Depends on | M1-13 (MVP acceptance), M1-09 (`/term` raw WS), M1-10 (Fleet start-session wizard), M1-11 (Attention queue), M0-04 (daemon config/token) |
-| Estimated effort | 3 days |
+| Depends on | M1-13 (MVP acceptance), M1-09 (`/term` raw WS), M1-10 (Fleet start-session wizard), M1-11 (Attention queue), M1-02 (pane reconcile/adoption), M0-04 (daemon config/token/single-instance lock) |
+| Estimated effort | 4 days |
 | Packages touched | `apps/desktop` (`src-tauri/`, `capabilities/`, `binaries/`, `resources/`), `apps/daemon` (bundle script, `--port`/`--adopt` flags, `desktop.*` config), `apps/web` (shell bridge, folder picker, quit-behaviour setting), `packages/sdk` (shell bridge DTOs), `tools/scripts` (`build-sidecar.sh`), `.github/workflows` (desktop build job, wired fully in M7-02) |
 | Risk | High (R7 — native modules vs packaging; ADR-005 is resolved here) |
 | Owner | |
@@ -25,12 +25,14 @@ Orchestra becomes a macOS application. `Orchestra.app` launches, starts `orchest
 ### In scope
 - **ADR-005 resolution** (written as `plan/adr/ADR-005-daemon-packaging.md`, status Accepted) — see §4.4.
 - `apps/desktop` Tauri 2 project: `src-tauri/` (Rust), `tauri.conf.json`, capability files, icons, `Info.plist` additions for the `orchestra://` URL scheme.
-- Sidecar lifecycle manager (Rust): port selection, spawn, health-wait, adopt-existing, graceful stop, crash restart with backoff, log tee to `~/.orchestra/logs/orchestrad.log`.
+- Sidecar lifecycle manager (Rust): endpoint discovery, port selection, spawn, health-wait, adopt-existing, **coordinated upgrade of an incompatible running daemon** (§4.7, ADR-020), graceful stop, crash restart with backoff, log tee to `~/.orchestra/logs/orchestrad.log`.
+- Endpoint discovery file `~/.orchestra/daemon.endpoint` written by the daemon and read by the app, `orch` (M7-06) and the PWA host (M7-03) — §4.7.
+- Daemon `POST /api/v1/daemon/drain` + `draining` state, so the upgrade protocol can stop new work without killing agents.
 - Main window loading `http://127.0.0.1:<port>/` with an injected `window.__ORCHESTRA_SHELL__` descriptor; navigation confined to the daemon origin.
 - Tray menu: fleet status line (`running / waiting / blocked`), Show Orchestra, Attention (n), Start session…, Open in browser, Restart daemon, Quit; tray icon template image reflecting the worst state.
 - Native notifications for `prompt.opened` with `priority ≤ 2`, coalesced, deep-linked; `orchestra://` deep-link handler (cold start + running app).
 - Native folder picker command (`pick_repo_folder`) surfaced in the M1-10 wizard, replacing the text input; recent repos still local to the web app.
-- `desktop.*` settings in `~/.orchestra/config.yaml`: `quitBehaviour`, `startAtLogin`, `notifications`, `port`, `adoptExisting`.
+- `desktop.*` settings in `~/.orchestra/config.yaml`: `quitBehaviour`, `startAtLogin`, `notifications`, `port`, `adoptExisting`, `dataDir`, `autoUpgradeDaemon`, `drainTimeoutMs`.
 - Dev loop: `pnpm --filter desktop dev` runs Vite + daemon from source; `pnpm --filter desktop build` produces an unsigned `.app`.
 - A shell-neutral `ShellBridge` in `apps/web` so every call degrades gracefully in a plain browser (feature detection, never `if (isTauri)` scattered through components).
 ### Out of scope (deferred to …)
@@ -46,7 +48,7 @@ No new core entities. The shell consumes existing read models: the `fleet` and `
 
 ```ts
 // packages/sdk/src/shell/bridge.ts
-export type DaemonMode = 'spawned' | 'adopted';
+export type DaemonMode = 'spawned' | 'adopted' | 'upgraded';
 export interface ShellDescriptor {
   readonly shell: 'tauri';
   readonly appVersion: string;      // Orchestra.app version
@@ -65,13 +67,28 @@ Rule: the web app must treat `window.__ORCHESTRA_SHELL__` as optional. `ShellBri
 // apps/desktop/src-tauri/src/daemon.rs
 pub struct DaemonHandle { pub url: String, pub mode: DaemonMode, pub pid: Option<u32> }
 
-pub enum DaemonError { PortUnavailable, SpawnFailed(String), HealthTimeout, VersionMismatch { running: String, bundled: String } }
+pub enum DaemonError {
+    PortUnavailable, SpawnFailed(String), HealthTimeout,
+    VersionMismatch { running: String, bundled: String },
+    /// Another process owns this data directory's lock and did not release it.
+    LockHeld { pid: u32, data_dir: String },
+    /// The user declined the coordinated upgrade (§4.7).
+    UpgradeDeclined,
+    /// The running daemon is NEWER than the bundled one — never downgraded automatically.
+    BundledOlderThanRunning { running: String, bundled: String },
+    DrainTimeout,
+}
 
 pub trait DaemonSupervisor {
-    /// Probe `GET /health` on the configured port. If a healthy daemon with a
-    /// compatible version answers and `adoptExisting` is true → adopt it.
-    /// Otherwise pick a free port, spawn the sidecar, wait for health.
+    /// Read `<data-dir>/daemon.endpoint`, probe `GET /health` on the URL it names
+    /// (falling back to `cfg.port` once if the file is absent).
+    ///   healthy + compatible version + adoptExisting → adopt it (mode = adopted)
+    ///   healthy + incompatible version               → `upgrade` (§4.7), never a second daemon
+    ///   nothing healthy                              → acquire the data-dir lock, spawn, wait for health
     fn ensure_running(&self, cfg: &DesktopConfig) -> Result<DaemonHandle, DaemonError>;
+    /// Coordinated upgrade of the daemon that currently owns this data directory:
+    /// drain → stop → wait for lock release → spawn bundled → reconcile → publish endpoint.
+    fn upgrade(&self, cfg: &DesktopConfig, running: &Endpoint) -> Result<DaemonHandle, DaemonError>;
     fn stop(&self, graceful_ms: u64) -> Result<(), DaemonError>; // SIGTERM → wait → SIGKILL
     fn restart(&self) -> Result<DaemonHandle, DaemonError>;
 }
@@ -89,8 +106,11 @@ Deliberately **not** commands: anything terminal-related, anything that reads or
 None in SQLite. New config block, validated by the existing Zod config schema (M0-04):
 ```yaml
 desktop:
-  port: 4300              # 0 = pick a free port
+  dataDir: ~/.orchestra   # the runtime namespace this app owns (ADR-020)
+  port: 4300              # PREFERRED port when this app spawns; discovery still wins (§4.7)
   adoptExisting: true
+  autoUpgradeDaemon: false     # true = run the §4.7 upgrade protocol without asking
+  drainTimeoutMs: 10000        # drain + lock-release budget before SIGKILL
   quitBehaviour: keep-daemon   # keep-daemon | stop-daemon | ask
   startAtLogin: false
   notifications:
@@ -162,8 +182,8 @@ Notes and constraints:
 - Crash policy: sidecar exit with a non-zero code → restart with backoff 1 s, 2 s, 5 s, 15 s (max 4 attempts in 5 min); after that the tray goes red and the window shows a "daemon stopped" screen with the last 50 log lines and a Retry button. Agents are unaffected — they live in tmux (D2).
 
 ### 4.5 API / UI surface
-- New daemon flags: `--port <n>`, `--resources <dir>`, `--adopt-check` (prints `{version, pid, port}` and exits 0 if healthy).
-- New daemon route: `GET /api/v1/shell/status` → `{ running, waiting, blocked, attention }` (cheap aggregate for the tray; the tray otherwise consumes the `fleet` WS topic).
+- New daemon flags: `--port <n>`, `--data-dir <dir>`, `--resources <dir>`, `--adopt-check` (prints the endpoint record and exits 0 if healthy).
+- New daemon routes: `GET /api/v1/shell/status` → `{ running, waiting, blocked, attention }` (cheap aggregate for the tray; the tray otherwise consumes the `fleet` WS topic); `POST /api/v1/daemon/drain` → `{ state: 'draining', inFlight: n }` (§4.7), idempotent, token-authenticated, refuses nothing else.
 - Web: `apps/web/src/shell/bridge.ts` (`ShellBridge`), `useShell()` hook; Fleet wizard step 3 gets a **Choose repository…** button when `capabilities` includes `folderPicker`; Settings → Desktop pane (quit behaviour radio, start at login, notification min-priority, "Open logs folder").
 - Deep links: `orchestra://attention/<promptId>`, `orchestra://session/<sessionId>`, `orchestra://terminals`. Handler maps to the web route and calls `window.location.assign(daemonUrl + route)` on the existing webview (no new window).
 - Tray menu items as listed in scope; the status line is a disabled item refreshed on every `fleet`/`prompts` delta, throttled to 1 Hz.
@@ -173,8 +193,12 @@ Notes and constraints:
 app launch
  → load DesktopConfig (~/.orchestra/config.yaml, defaults if absent)
  → DaemonSupervisor.ensure_running()
-      GET /health on cfg.port ──healthy & version compatible & adoptExisting──▶ mode = adopted
-      └─ else: pick free port → spawn sidecar → poll /health (250 ms, 20 s budget) → mode = spawned
+      read <data-dir>/daemon.endpoint (fall back to cfg.port once if absent)
+      GET /health ──healthy & major.minor match & adoptExisting──▶ mode = adopted
+                  ──healthy & incompatible version─────────────▶ coordinated upgrade (§4.7) → mode = upgraded
+                                                                 (NEVER a second daemon on this data dir)
+      └─ nothing healthy: acquire <data-dir>/orchestrad.lock → pick port (preferred: endpoint/cfg)
+                          → spawn sidecar → poll /health (250 ms, 20 s budget) → mode = spawned
  → read ~/.orchestra/token (0600) → build window URL
  → WebviewWindow(main, url) with initialization_script(__ORCHESTRA_SHELL__ = descriptor)
  → tray init → open WS /ws?token=… from Rust (tokio-tungstenite) subscribing topics ['fleet','prompts']
@@ -187,13 +211,55 @@ Quit (⌘Q / tray Quit):
    quitBehaviour = ask        → modal: "Keep agents' daemon running?" [Keep] [Stop] [Cancel]
 ```
 
+### 4.7 Daemon ownership and the coordinated upgrade protocol (ADR-020)
+**One daemon owner per data directory.** `~/.orchestra` (or `--data-dir <d>`) is a single-writer runtime namespace: the SQLite file, the tmux socket name, the recording store, the token, and the endpoint file all belong to it. M0-04's single-instance lock — now explicitly `<data-dir>/orchestrad.lock` next to `orchestrad.pid` — is held by exactly one process, and a second `orchestrad` started against the same data directory refuses to boot with exit 3 *whatever port it was given*. The shell never works around that lock, and "spawn on a different port" is not an upgrade strategy: a second supervisor on one data directory would mean two owners of the same DB, the same tmux socket and the same session rows.
+
+**Endpoint discovery.** The daemon writes `<data-dir>/daemon.endpoint` (mode 0600, written to a temp file and `rename`d, so readers never see a half-file) once it is listening, and removes it on graceful shutdown:
+```json
+{ "url": "http://127.0.0.1:4317", "port": 4317, "pid": 8821, "version": "1.4.2",
+  "apiVersion": "v1", "dataDir": "/Users/x/.orchestra", "tmuxSocket": "orchestra",
+  "startedAt": "2026-09-15T10:03:11.412Z" }
+```
+`Orchestra.app`, `orch` (M7-06) and the PWA host (M7-03) all resolve the daemon through this file instead of assuming 4300; `desktop.port` is only the *preferred* port used when this app is the one spawning. **No reader caches a stale port beyond one failed health check**: on connection-refused, a health 4xx/5xx, or a `pid` that no longer exists, the reader re-reads `daemon.endpoint` exactly once, and if that still fails it declares the daemon down rather than retrying a remembered URL.
+
+**Version mismatch runs the upgrade protocol; it never spawns a second daemon.**
+```
+detect mismatch: endpoint.version vs bundled version, compared on major.minor
+ → desktop.autoUpgradeDaemon = false → modal: "Orchestra 1.5.0 needs to upgrade the running daemon (1.4.2).
+      Agents already running stay alive. No new sessions start until the upgrade finishes."
+      [Upgrade] [Open in browser instead] [Quit]     ← declining is UpgradeDeclined, not a second daemon
+   desktop.autoUpgradeDaemon = true  → proceed; tray shows "upgrading daemon…"
+ → DRAIN:    POST /api/v1/daemon/drain → daemon state `draining`: new session starts rejected with
+             409 `daemon_draining`, in-flight HTTP/WS requests finish, the event store flushes.
+             Running agents are NOT touched — they are tmux panes (D2), not daemon children.
+ → STOP:     SIGTERM the old daemon → it closes the DB, removes daemon.endpoint, releases orchestrad.lock,
+             and leaves the tmux server and every pane running. Budget `drainTimeoutMs` (default 10 s),
+             then SIGKILL; the lock is reclaimed only after the pid is confirmed gone.
+ → START:    spawn the bundled sidecar on the SAME data dir, preferring the port the old daemon used so
+             helpers reconnect to the same URL → it runs Kysely migrations → waits for /health.
+ → ADOPT:    M1-02 reconcile runs: panes tagged ORCH_SESSION_ID are adopted, DB-running-but-missing panes
+             are marked `crashed`, orphan policy as configured. The ReconcileReport is surfaced, not swallowed.
+ → PUBLISH:  the new daemon writes daemon.endpoint; `orch`, other browser tabs and the PWA pick it up on
+             their next failed request (one re-read, per the discovery rule above).
+ → mode = 'upgraded'; the window loads the resolved URL and shows a banner:
+   "Daemon upgraded 1.4.2 → 1.5.0 · N sessions adopted · M marked crashed".
+```
+Compatibility rule: `major.minor` equal → adopt as-is (patch drift is adopted, not upgraded); otherwise run the protocol. **Downgrade is never automatic**: if the running daemon is newer than the bundled one (`BundledOlderThanRunning`), the app refuses to drain or stop it and tells the user to update the app — an older daemon must never be pointed at a database migrated by a newer one.
+
+**The only supported second daemon** is a fully separate runtime namespace: its own `--data-dir`, its own tmux socket name (`tmux -L <socket>`, so panes cannot be cross-adopted), its own port and its own `daemon.endpoint`. `desktop.dataDir` exists for exactly that (a dev instance beside a production one). Two daemons sharing one data directory is not a configuration this product supports.
+
+**Prompts across the upgrade.** The guarantee is M5-05's: durable prompts with explicit recovery outcomes, not "nothing is lost". A prompt whose answer was submitted but never structurally acknowledged stays `delivery_uncertain` (M1-11 answer states) across the restart and is re-surfaced for a human decision; it is never silently marked answered because the daemon changed.
+
 ## 5. Tasks
 - [ ] Write `plan/adr/ADR-005-daemon-packaging.md` with the three options, the decision (Option B), and the consequences; update `plan/DECISIONS.md` row to Accepted and link it here.
 - [ ] `rustup` install + `cargo tauri` CLI; record versions in `plan/ENVIRONMENT.md` log.
 - [ ] Scaffold `apps/desktop` (Tauri 2), wire into pnpm workspace + turbo (`build:desktop` depends on `build:daemon`, `build:web`).
 - [ ] `tools/scripts/build-sidecar.sh`: download + checksum Node 22 per arch, esbuild `apps/daemon` → `orchestrad.cjs`, stage native addons per arch, copy migrations + built web, emit `resources/` and `binaries/` trees; idempotent, with a manifest file listing every staged artifact (M7-02 signs from this list).
-- [ ] Daemon: `--port`/`--resources`/`--adopt-check` flags; native-module resolution shim; `GET /api/v1/shell/status`; `desktop.*` config schema.
-- [ ] Rust `DaemonSupervisor` (spawn/adopt/health-wait/stop/restart/backoff) + unit tests with a stub daemon binary.
+- [ ] Daemon: `--port`/`--data-dir`/`--resources`/`--adopt-check` flags; native-module resolution shim; `GET /api/v1/shell/status`; `desktop.*` config schema.
+- [ ] Daemon: `<data-dir>/orchestrad.lock` (extends M0-04's single-instance lock with the data-dir identity), atomic `daemon.endpoint` write on listen + unlink on graceful stop, `POST /api/v1/daemon/drain` and the `draining` state (409 `daemon_draining` for new session starts).
+- [ ] Rust `DaemonSupervisor` (discover/spawn/adopt/health-wait/**upgrade**/stop/restart/backoff) + unit tests with a stub daemon binary.
+- [ ] Coordinated upgrade protocol end to end (§4.7): mismatch detection, consent modal + `autoUpgradeDaemon`, drain, stop, lock-release wait, spawn, reconcile banner, endpoint republish; downgrade refusal.
+- [ ] Endpoint-discovery helper shared by the app and `orch` (M7-06): read file → health → one re-read on failure → "daemon down"; no cached port.
 - [ ] Main window creation with resolved URL + `initialization_script` + show-on-ready + navigation allowlist (block any URL not on the daemon origin).
 - [ ] Capability file `local-daemon.json`; four Tauri commands; assert in a test that no `shell`/`fs`/`http` permission is present.
 - [ ] Tray: icon states, menu, live status from the Rust WS client, 1 Hz throttle.
@@ -209,13 +275,20 @@ Quit (⌘Q / tray Quit):
 | ID | Level | Test | Expected |
 |---|---|---|---|
 | UT-M7-01-01 | unit (Rust) | `DaemonSupervisor::ensure_running` with a healthy stub on the configured port | `mode = adopted`, no process spawned |
-| UT-M7-01-02 | unit (Rust) | `ensure_running` when `/health` reports an incompatible daemon version | `VersionMismatch`; no adoption; spawns on a different port when `adoptExisting` is false |
+| UT-M7-01-02 | unit (Rust) | `ensure_running` when `/health` reports an incompatible daemon version (`autoUpgradeDaemon = false`, consent declined) | `UpgradeDeclined`; **no second daemon spawned on the same data dir**; the old daemon is still listening on its port and still owns the lock |
 | UT-M7-01-03 | unit (Rust) | health poll never answers within 20 s | `HealthTimeout`; child killed; no orphan process (`ps` assertion in the test harness) |
 | UT-M7-01-04 | unit | `ShellBridge.pickRepoFolder()` in a plain browser (no `__ORCHESTRA_SHELL__`) | `err('unsupported')`; wizard renders the text input |
 | UT-M7-01-05 | unit | notification coalescing: 5 `prompt.opened` within 3 s | one notification, body "5 prompts need you", deep link `/attention` |
 | IT-M7-01-06 | integration | `build-sidecar.sh` output tree | manifest lists `orchestrad.cjs`, both `.node` files for the host arch, `spawn-helper`, migrations, web assets; `node orchestrad.cjs --adopt-check` exits 0 against a running daemon |
 | IT-M7-01-07 | integration | capability file audit | parsed `local-daemon.json` contains none of `shell:`, `fs:`, `http:` permissions; command list equals the four allowed commands |
 | IT-M7-01-08 | integration | deep-link parser | `orchestra://attention/01J…` → route `/attention/01J…`; unknown host → `/attention`; path traversal (`orchestra://attention/../../etc`) → rejected |
+| UT-M7-01-14 | unit (Rust) | endpoint discovery: `daemon.endpoint` names port 4317, nothing listens there | one re-read of the file, then `daemon down`; the stale port is not retried and is not cached for the next probe |
+| UT-M7-01-15 | unit (Rust) | `upgrade()` happy path against a stub daemon | order is drain → SIGTERM → lock released → spawn → health → reconcile → endpoint written; `mode = upgraded`; the stub records exactly one drain call |
+| UT-M7-01-16 | unit (Rust) | `upgrade()` when the stub ignores SIGTERM | SIGKILL after `drainTimeoutMs`; the new daemon is spawned only after the lock file's pid is confirmed gone; never two live pids on the data dir |
+| UT-M7-01-17 | unit (Rust) | bundled version older than the running daemon | `BundledOlderThanRunning`; no drain, no stop, no spawn; user-facing message says to update the app |
+| IT-M7-01-18 | integration | second `orchestrad` started with the same `--data-dir` on a different port | exits 3 `already running (pid N)`; no DB write, no `daemon.endpoint` overwrite, no tmux socket touched |
+| IT-M7-01-19 | integration | two daemons with separate `--data-dir` + tmux socket + port | both boot, each writes its own `daemon.endpoint`, neither adopts the other's panes (`ORCH_SESSION_ID` lookups are socket-scoped) |
+| IT-M7-01-20 | integration | drain semantics | during `draining`: `POST /sessions` → 409 `daemon_draining`; an in-flight request completes; live tmux panes still present after the daemon exits |
 | E2E-M7-01-09 | e2e | built `.app` + FakeProvider: launch, start a fake session, stream output | pane renders; Tauri IPC message counter = 0 for the duration; app exit leaves no orphan node process when `quitBehaviour = stop-daemon` |
 
 ### 6.2 Manual test cases (run by you before marking ✅)
@@ -233,12 +306,20 @@ Quit (⌘Q / tray Quit):
 | TC-M7-01-10 | **Negative** — port already taken by something else | 1. `nc -l 4300` in a terminal 2. launch the app | Health probe fails fast (not a 20 s hang), a free port is chosen, the window loads on it, Settings shows the actual port | ⬜ |
 | TC-M7-01-11 | **Negative** — missing native addon | 1. rename `resources/daemon/native/<arch>/better_sqlite3.node` 2. launch | Daemon exits with a readable error; the app shows the "daemon stopped" screen naming the missing module; nothing silently falls back to an in-memory DB | ⬜ |
 | TC-M7-01-12 | **Resilience** — daemon killed while the app is open | 1. with a pane streaming, `kill -9` the daemon 2. watch | Tray goes amber → daemon restarts → the web app reconnects over WS (`sinceEventId`, M5-05) and the pane resumes; no lost prompt; restore banner appears | ⬜ |
+| TC-M7-01-14 | Coordinated daemon upgrade (consent) | 1. run daemon v(n-1) from a terminal with 2 live sessions 2. launch an app bundling v(n) 3. accept the upgrade 4. `pgrep -c orchestrad` throughout 5. `tmux -L orchestra ls` | Modal explains the upgrade and that agents stay alive; count never exceeds 1; both panes still alive and adopted; banner reports "N adopted"; `~/.orchestra/daemon.endpoint` now names the new pid/version | ⬜ |
+| TC-M7-01-15 | Upgrade declined | 1. same setup 2. choose **Open in browser instead** | No drain, no kill, no second daemon (`pgrep -c orchestrad` = 1); the browser opens the old daemon's URL; the app quits or stays in the tray without owning a daemon | ⬜ |
+| TC-M7-01-16 | Helpers re-read the endpoint | 1. open `orch fleet --watch` in a terminal against the old daemon 2. run the upgrade 3. watch the CLI | The CLI's request fails once, it re-reads `daemon.endpoint`, reconnects to the new daemon and keeps streaming; it never hangs on the old port | ⬜ |
+| TC-M7-01-17 | **Negative** — two daemons, one data dir | 1. daemon running 2. `orchestrad --data-dir ~/.orchestra --port 4399` | Exits 3 with "already running (pid N)"; `daemon.endpoint` still names the first daemon; no DB corruption, no new tmux server | ⬜ |
+| TC-M7-01-18 | Separate namespace side-by-side | 1. `orchestrad --data-dir ~/.orchestra-dev --port 4399` with tmux socket `orchestra-dev` 2. launch the app (prod data dir) | Both run; each tray/CLI sees only its own sessions; killing one leaves the other's panes untouched | ⬜ |
+| TC-M7-01-19 | Prompt across an upgrade | 1. trigger a permission prompt 2. run the upgrade before answering 3. open Attention | The prompt is still there after the upgrade with its original text and generation; if an answer had been submitted but not acknowledged it shows `delivery_uncertain` and asks for a decision — it is never auto-resolved | ⬜ |
 | TC-M7-01-13 | Both architectures | 1. build and launch the arm64 `.app` 2. on an x64 Mac (or `arch -x86_64` where possible) launch the x64 build | Both start their own sidecar, load native addons, and run a FakeProvider session; record app sizes in `evidence/` | ⬜ |
 
 ## 7. Acceptance criteria (Definition of Done)
 - [ ] ADR-005 written, status Accepted, linked from `DECISIONS.md`, and the chosen option is the one actually implemented.
 - [ ] `Orchestra.app` (unsigned) builds for `darwin-arm64` and `darwin-x64` from a clean checkout with one command, including the sidecar staging script.
-- [ ] Daemon lifecycle: spawn, adopt, health-wait, graceful stop, crash backoff — all implemented and covered by UT-M7-01-01..03.
+- [ ] Daemon lifecycle: discover, spawn, adopt, health-wait, graceful stop, crash backoff — all implemented and covered by UT-M7-01-01..03.
+- [ ] **One daemon owner per data directory (ADR-020)**: the app never runs a second daemon against a data directory that already has one; a version mismatch resolves through the §4.7 protocol (drain → stop → start bundled → reconcile → republish endpoint) or through an explicit refusal; downgrade is refused. Covered by UT-M7-01-15..17, IT-M7-01-18, TC-M7-01-14/15/17.
+- [ ] `daemon.endpoint` is written atomically by the daemon and is the only way the app, `orch` and the PWA resolve the daemon URL; no component caches a port past one failed health check (UT-M7-01-14, TC-M7-01-16).
 - [ ] Tray shows live fleet status; native notifications fire for priority ≤ configured threshold and deep-link to the exact prompt.
 - [ ] Terminals demonstrably use `/term` only — IPC counter 0 during streaming (TC-M7-01-03), and the capability audit test (IT-M7-01-07) passes.
 - [ ] Native folder picker replaces the M1-10 text input inside the shell and degrades to the text input in a plain browser.
@@ -250,7 +331,9 @@ Quit (⌘Q / tray Quit):
 ## 8. Risks / open questions
 - **R7**: `node-pty`'s `spawn-helper` is a separate Mach-O inside the addon and is easy to miss when signing; it is listed explicitly in the build manifest so M7-02 signs it. Whether the hardened runtime needs `com.apple.security.cs.disable-library-validation` for these addons is decided in M7-02 — "(verify)" by experiment, and the answer determines whether Option B survives.
 - The exact Tauri 2 capability key for remote-origin IPC (`remote.urls`) and its wildcard syntax must be checked against the Tauri version pinned at step start — "(verify)". If wildcards are not allowed on ports, the window must be built after the port is known and the capability generated at runtime, or the port must be fixed to 4300.
-- Adopting a daemon started by a *different* app version is a compatibility hazard; v1 refuses to adopt when the minor version differs and spawns its own on another port. Whether to instead offer "restart the running daemon" is an open UX question.
+- The upgrade protocol has a window between "old daemon exited" and "new daemon healthy" in which no daemon is accepting prompts. Agents keep running (tmux), but a vendor prompt raised in that window is only captured when the agent re-emits it or the hook retries — this is the M5-05 "capture during daemon downtime" guarantee, and the banner must state the window length rather than implying nothing could have been missed.
+- `drainTimeoutMs` is a guess; measure the real drain time with a loaded event store before fixing the default, and never let SIGKILL precede a confirmed flush of the event store.
+- Whether the consent modal should offer "upgrade later, keep using the old daemon read-only" is an open UX question; v1 offers Upgrade / Open in browser / Quit only.
 - Tray status derived from a Rust WS client duplicates the web app's subscription; if this proves flaky, fall back to polling `GET /api/v1/shell/status` at 2 s — measured, not assumed.
 - `titleBarStyle: Overlay` interacts with the web app's own header layout; if it looks wrong, fall back to the default title bar rather than spending time here.
 - macOS 14.0 as the floor is a guess aligned with the plan's "macOS 14+" note; confirm against the actual `objc2`/WebKit requirements of the pinned Tauri version — "(verify)".

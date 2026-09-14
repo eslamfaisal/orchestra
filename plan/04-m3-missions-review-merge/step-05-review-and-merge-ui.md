@@ -43,13 +43,16 @@ The **Review** screen (IA position 7, `12-ux-principles.md`) becomes real: a que
   ```
   allowed = verdict ∈ {approved, approved_with_nits}
           ∧ no unresolved finding with severity ∈ {blocker, major}
-          ∧ tests.passed ≠ false
+          ∧ validation.status ∈ {passed, policy_authorized_not_required}
+          ∧ sourceHead = result.headSha = review.headSha = approval.headSha
+          ∧ validation.commit = candidateCommit
+          ∧ targetHead = validatedTargetHead
           ∧ gateSatisfied(step.gate, actor)
           ∧ task.state ∈ {approved}
   ```
-  Returns `{ allowed: boolean, blockers: MergeBlocker[] }` where `MergeBlocker = { code: 'NotApproved'|'OpenFindings'|'TestsFailed'|'GateNotSatisfied'|'BranchStale'|'MergeConflict', detail }`. 100 % branch coverage; the UI renders `blockers` verbatim.
+  Returns `{ allowed: boolean, blockers: MergeBlocker[] }` where `MergeBlocker = { code: 'NotApproved'|'OpenFindings'|'TestsFailed'|'ValidationMissing'|'RevisionChanged'|'GateNotSatisfied'|'BranchStale'|'MergeConflict', detail }`. 100 % branch coverage; the UI renders `blockers` verbatim.
 - `HumanComment` is persisted as a `ReviewFinding` with `authorKind: 'human'`, `severity` chosen by the user (default `major`), and `sent_to_author = 0` until delivered — one table, one lifecycle, no parallel comment model.
-- Gate semantics (from M3-01/M3-02): `none` ⇒ satisfied; `lead` ⇒ satisfied when the Lead called `collect(decision: accept)`; `human` ⇒ satisfied by this screen's Approve; `4-eyes` ⇒ treated as `human` with a warning badge until M9-04.
+- Gate semantics (from M3-01/M3-02): `none` ⇒ satisfied; `lead` ⇒ satisfied when the Lead called `collect(decision: accept)`; `human` ⇒ satisfied by this screen's Approve; `4-eyes` ⇒ blocked as unsupported until M9-04; never downgraded to one human.
 
 ### 4.2 Interfaces / contracts
 ```ts
@@ -130,6 +133,9 @@ human clicks Merge ─▶ MergeTask
    └─ all mission tasks merged ─▶ mission state → merging (M3-06 opens the PR)
 ```
 
+### 4.7 Review reconciliation contract (2026-09-15)
+Review and human approval records include task attempt, specHash, source commit and target base. Build the proposed integration commit in a clean temporary checkout, run required checks on that exact commit and present its source/target/candidate hashes for approval. Squash and merge-commit strategies validate their newly created candidate; ff-only validates the source commit. Merge promotes the validated candidate with compare-and-swap against the expected target head. A changed source or target invalidates candidate checks and approval; regenerate and revalidate before promotion. Persist command, environment/toolchain identity, start/end, exit status and log hash. `not-required` is an explicit policy result, never inferred from null. API approve/merge requests carry expected hashes; reject stale requests with 409.
+
 ## 5. Tasks
 - [ ] `MergeEligibility` rule + `MergeBlocker` union in `packages/core/src/review/merge-rules.ts` (100 % branch tests).
 - [ ] Migrations `m3_05_findings_human`, `m3_05_tasks_merge`; repository methods for human comments.
@@ -177,7 +183,14 @@ human clicks Merge ─▶ MergeTask
 | TC-M3-05-10 | Restart while reviewing (resilience) | 1. Add two comments 2. `kill -9` the daemon 3. Restart and reopen the task | Comments still present and still unsent; sending after restart works and is audited once | ⬜ |
 | TC-M3-05-11 | RTL + keyboard | 1. Switch UI to Arabic 2. Navigate with `j/k`, `n/p`, approve with `a` | Layout mirrors correctly (gutter on the correct side), diff text stays LTR, all shortcuts work, focus ring visible | ⬜ |
 
+### 6.3 Review regression scenarios
+- [ ] Change source after approval: merge blocks.
+- [ ] Move target during validation or promotion: CAS fails and requires a fresh candidate.
+- [ ] Null/unknown checks block; explicit policy exemption is recorded.
+- [ ] Parallel changes pass individually but fail integrated tests: target remains unchanged.
+
 ## 7. Acceptance criteria (Definition of Done)
+- [ ] The review reconciliation contract and all §6.3 regression scenarios pass; archive evidence alongside the original test cases.
 - [ ] A human can go from "task finished" to "merged into the mission branch" without leaving the Review screen (TC-M3-05-01, -07).
 - [ ] Every message sent to an agent from this screen is previewed verbatim, hash-checked, delivered through `PaneController`, and audited (TC-M3-05-03, -04).
 - [ ] The merge button is never enabled when `MergeEligibility.allowed` is false, and always states its blockers as text (E2E-M3-05-02, TC-M3-05-06).

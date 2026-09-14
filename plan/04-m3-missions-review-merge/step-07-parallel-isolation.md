@@ -39,7 +39,7 @@ Two or more agents can work on the same repository at the same time without coll
 ## 4. Design
 ### 4.1 Domain (entities, value objects, rules)
 - `PortLease { id, taskId, worktreeId, port, index, state: 'held'|'released', acquiredAt, releasedAt? }`.
-- `DbSuffix` value object: `_orch_<first 8 chars of taskId, lowercased>` — deterministic from the task id, ≤ 16 chars, `[a-z0-9_]` only, so it is a legal identifier suffix in Postgres, MySQL, SQLite filenames and Redis key prefixes.
+- `DbSuffix` value object: `_orch_<full taskId, lowercased>` — deterministic from the entire task id, 33 chars for a ULID, `[a-z0-9_]` only, so it is a legal identifier suffix in Postgres, MySQL, SQLite filenames and Redis key prefixes.
 - `PortAllocator` (pure allocation rule + injected `PortProbe`):
   - `allocate(range, held: Set<number>, reserved: Set<number>, count) → Result<number[], IsolationError>`; deterministic ordering (lowest free first) so two runs of the same mission are comparable; skips reserved and held; asks `PortProbe.isFree(port)` for each candidate; `Err(NoFreePort)` when the range is exhausted.
   - `reclaim(leases, now, ttlMs, isTaskActive) → PortLease[]` — leases whose task is not active (or older than `ttlMs`) are released.
@@ -124,6 +124,9 @@ task ends ─▶ CollectTaskResult ─▶ WorktreeManager.remove ─▶ Isolatio
 daemon boot ─▶ reclaim(leases, now, ttl, isTaskActive) ─▶ release orphans ─▶ log count
 ```
 
+### 4.7 Review reconciliation contract (2026-09-15)
+Reserve database/cache namespaces using the full task ID with a uniqueness constraint. Validate the complete identifier against the target engine length limit (including the application prefix). A dialect with shorter limits uses a sufficiently long hash of the entire ID with collision detection and a persisted mapping. ORCH_DATABASE_SUFFIX and cache prefixes are effective only when the app/test harness honors them; require a configured isolation smoke test. Otherwise mark external-service isolation unsupported and serialize those tasks or require an explicit shared-service policy.
+
 ## 5. Tasks
 - [ ] `PortLease`, `DbSuffix`, `PortAllocator` (`allocate`, `reclaim`) in `packages/core/src/isolation/` with 100 % branch tests.
 - [ ] Migration `m3_07_port_leases` (+ partial unique index); `SqlitePortLeaseRepository` + in-memory twin.
@@ -168,7 +171,13 @@ daemon boot ─▶ reclaim(leases, now, ttl, isTaskActive) ─▶ release orphan
 | TC-M3-07-07 | Orphan reclamation | 1. Stop the daemon 2. `tmux kill-session -t orchestra` 3. Start the daemon | Boot sweep releases the orphaned leases and logs the count; `GET /isolation/leases` shows none held | ⬜ |
 | TC-M3-07-08 | Foreign process squats a port (negative) | 1. `python3 -m http.server 4403` 2. Start a task | The allocator skips 4403; the task gets another port; no failure surfaced to the user | ⬜ |
 
+### 6.3 Review regression scenarios
+- [ ] Create 10,000 IDs with identical timestamp: namespaces unique.
+- [ ] Force a hash collision: reservation fails or allocates a checked alternate.
+- [ ] Application ignores env suffix: concurrent shared-service execution is blocked.
+
 ## 7. Acceptance criteria (Definition of Done)
+- [ ] The review reconciliation contract and all §6.3 regression scenarios pass; archive evidence alongside the original test cases.
 - [ ] Every task session (author, reviewer, retry) launches with the complete `ORCH_*` env set at process start (TC-M3-07-01).
 - [ ] Two parallel tasks on one repo never share a port or a db suffix (IT-M3-07-01, TC-M3-07-02, TC-M3-07-03).
 - [ ] `PortAllocator` has 100 % branch coverage; allocation is deterministic and never partial.

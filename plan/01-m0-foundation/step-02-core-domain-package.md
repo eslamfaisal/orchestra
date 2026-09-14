@@ -62,7 +62,7 @@ Every value object has `parse(x: unknown): Result<VO, DomainError>` backed by a 
 ### 4.3 Data / schema changes
 None (types only). Table shapes in `04-domain-model.md` §4 are the target for M0-04/05.
 ### 4.4 Infrastructure
-None. `package.json` `dependencies`: `neverthrow`, `zod` only.
+None. `package.json` `dependencies`: `neverthrow`, `zod` — and nothing else. These two are *runtime* dependencies (not type-only): `Result` is a value and Zod schemas execute at parse time. That is why the M0-01 boundary rule is `core-allowed-deps` (an allowlist) rather than "core imports nothing"; purity here means **no I/O and no node builtins**, not zero packages.
 ### 4.5 API / UI surface
 None.
 ### 4.6 Flow
@@ -89,21 +89,21 @@ n/a
 | UT-M0-02-03 | property | value objects `parse(print(x)) == x` | holds for 1000 cases each |
 | UT-M0-02-04 | unit | `eventSchema` registry covers every `DomainEvent['type']` | compile-time exhaustive check + runtime test |
 | UT-M0-02-05 | unit | `DomainError` codes unique | set size == union size |
-| AT-M0-02-06 | architecture | depcruise `core-imports-nothing` | 0 violations |
+| AT-M0-02-06 | architecture | depcruise `core-allowed-deps` on the finished package | 0 violations; the only external specifiers resolved from `packages/core` are `neverthrow` and `zod` |
 
 ### 6.2 Manual test cases
 | ID | Scenario | Steps | Expected result | Status |
 |---|---|---|---|---|
 | TC-M0-02-01 | Coverage gate | 1. `pnpm --filter @orchestra/core test -- --coverage` | branches 100 % on `session|task|mission|prompt|repairCase` machines and `value-objects`; no threshold failure | ⬜ |
 | TC-M0-02-02 | Public API is deliberate | 1. open `dist/index.d.ts` | only intended names exported; no `any` | ⬜ |
-| TC-M0-02-03 | Purity | 1. `grep -r "node:" packages/core/src` 2. check `package.json` deps | no node builtins; deps = neverthrow, zod only | ⬜ |
+| TC-M0-02-03 | Purity — the allowlist, not "nothing" | 1. `grep -rn "from 'node:\|require('node:" packages/core/src` 2. `cat packages/core/package.json` 3. `pnpm depcruise` | 1: no hits (no node builtins, no I/O); 2: `dependencies` is exactly `neverthrow` + `zod`, `devDependencies` may hold test tooling only; 3: `core-allowed-deps` reports 0 violations. Core is *pure*, not dependency-free | ⬜ |
 | TC-M0-02-04 | Invalid transition surfaces cleanly | 1. in a REPL call `transitionSession(stoppedSession, {type:'ready'})` | `Err({code:'INVALID_TRANSITION', from:'stopped', event:'ready'})`, no throw | ⬜ |
 | TC-M0-02-05 | Event registry | 1. add a new event type without a schema 2. `pnpm typecheck` | compile error pointing at the registry | ⬜ |
 
 ## 7. Acceptance criteria
 - [ ] All entities/VOs/state machines/ports from `04-domain-model.md` exist with docs.
 - [ ] 100 % branch coverage on state machines and VO validation; ≥ 90 % package.
-- [ ] Zero runtime deps besides neverthrow + zod; depcruise clean.
+- [ ] Runtime dependencies are exactly `neverthrow` + `zod` and no node builtins are imported; `core-allowed-deps` (M0-01 §4.4) reports 0 violations.
 - [ ] Event catalog types + schemas exhaustive (compile-time check).
 - [ ] All TC pass; no new lint/arch violations.
 

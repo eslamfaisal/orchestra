@@ -20,6 +20,11 @@ Score = Likelihood (1–5) × Impact (1–5). Review at every milestone boundary
 | R14 | Name/trademark conflict forces late rename | 3 | 3 | 9 | clearance report | ADR-002 early; keep brand out of package internals (use `orch`/`orchestrad` ids configurable) | | Open |
 | R15 | OTel GenAI conventions change | 3 | 1 | 3 | semconv release | pinned snapshot + dual-emit env flag | | Open |
 | R16 | Solo-developer bandwidth; estimates slip | 4 | 3 | 12 | milestone end dates missed by > 30 % | parallel lanes after M1; defer M7-07, M9, M10 items; MVP first | | Open |
+| R17 | Antigravity terms §6 and headless interaction contract unresolved; wrapper may not be permitted | 4 | 3 | 12 | no written terms resolution; agy evidence row stays `unverified` | ADR-008 amended gate; adapter disabled and outside every dependency/acceptance criterion; 1.0 DoD needs four adapters without agy | | Open |
+| R18 | Provider capability assumptions unproven (hook names, approval payloads, app-server reconnect, quota surfaces) until tested on real CLIs | 5 | 4 | 20 | "verify at step start" notes still open when M1-05/06 begin | M0-09 evidence matrix with real-CLI fixtures gates M1-05/M1-06; FakeProvider passes never flip a state to `verified`; capability states disable features, not providers | | Open |
+| R19 | Enterprise RBAC mistaken for user isolation; shared OS identity, home, provider auth and tmux across users | 3 | 5 | 15 | multi-tenant pilot request; audit finding | ADR-019: v1 = trusted shared-team install, stated in UI/docs; isolated execution designed post-1.0 with a written trigger | | Open |
+| R20 | In-process plugin code executes with daemon privileges; signature proves provenance, not behaviour | 3 | 5 | 15 | first community provider plugin submission | ADR-014 amended: trusted-tier only in-process; community provider plugins not loadable until an isolated plugin host exists | | Open |
+| R21 | Estimates optimistic for provider integration, recovery correctness, desktop packaging, enterprise isolation, plugin security | 4 | 3 | 12 | M0-09 or M1-05/06 overrun > 30 % | 30 % contingency on those steps in PROGRESS target dates; ≥ 30-day KPI window scheduled from M8 exit; re-plan at each milestone gate | | Open |
 
 ## Retired risks
 | ID | Risk | Closed | Why |

@@ -11,20 +11,33 @@
 | Owner | |
 
 ## 1. Goal
-`@orchestra/provider-claude` implements the full `ProviderAdapter` for Claude Code through official surfaces only: `AuthProbe` via `claude /status`-style quota-free probe, `Launcher` for interactive PTY sessions (with hooks + MCP config written per worktree) and headless runs (`-p --output-format stream-json`), `TelemetryParser` for hook payloads and stream-json lines, `RateLimitParser` for 429/quota messages, `PaneController` for slash commands, model switch and prompt answers (hook-response first, `send-keys-acked` fallback), and a manifest v0 with fixtures recorded from Claude Code 2.1.216. Contract tests pass.
+`@orchestra/provider-claude` implements the full `ProviderAdapter` for Claude Code through official surfaces only: `AuthProbe` via a quota-free status probe, `Launcher` for interactive PTY sessions (hooks + MCP config written per worktree) and headless runs (`-p --output-format stream-json` **with a permission host**), `TelemetryParser` for hook payloads and stream-json lines, `RateLimitParser` for 429/quota messages, `PaneController` for slash commands, model switch and prompt answers, and a manifest v0 with fixtures recorded from Claude Code 2.1.216. Contract tests pass.
+
+### The approval contract (corrected)
+The earlier draft treated `AskUserQuestion` and `ExitPlanMode` as **hook events** and excluded `updatedInput` from v1. Both are wrong.
+
+- **`AskUserQuestion` and `ExitPlanMode` are tools, not hooks.** They are intercepted like any other tool call, through `PreToolUse`. There is no `AskUserQuestion` hook and no `ExitPlanMode` hook to subscribe to.
+- **Answering them programmatically means rewriting their input**, so `updatedInput` **is in scope for v1** — for exactly these two tools. Returning `permissionDecision: "allow"` alone does not carry the user's chosen option or the plan verdict; it only lets the tool proceed to ask.
+- For every **other** tool, v1 uses `permissionDecision: allow | deny | ask` (with `permissionDecisionReason`) and does **not** rewrite input. Editing arbitrary tool arguments from Orchestra stays out of scope (M2+).
+- **Nothing in this step may depend on a hook name or response field that is not listed in §4.2's evidence table.** Every name carries an M0-09 evidence-matrix row id and is `unverified` until that row is filled on the real CLI. An `unverified` row disables the affected prompt kind for this provider (capability state per `00-foundations/14-provider-evidence-matrix.md`); it does not disable the adapter.
+
+### Two separate flows, verified separately
+1. **Interactive PTY** — the user-visible TUI in a tmux pane. Hooks fire; the daemon holds the hook's HTTP response and answers it. The **user can also answer in the pane**, so the adapter must reconcile: whoever answers first wins, and the other side is reconciled rather than overwritten (§4.6).
+2. **Headless `-p`** — no TUI, no human at the keyboard. Hooks alone are **not** an approval channel here: a tool that needs approval and has no permission host is **denied by the CLI**. Orchestra therefore supplies a permission host — `--permission-prompt-tool` pointing at an MCP tool served by `orch mcp serve` (SDK `canUseTool` is the equivalent for embedded use, not used in v1). Without it we do not pretend a prompt exists: the run proceeds with tools denied and the adapter reports that, rather than fabricating an `AgentPrompt`.
 
 ## 2. Why
 D4/D5 (official channels, plugin), C1/C3/C7/C8, G1, `05-provider-contract.md` §3 row "Claude Code".
 
 ## 3. Scope
 ### In scope
-- Manifest v0 (`manifest.json`): models (Sonnet/Opus/Fable ids as listed by the CLI "(verify)"), features `hooks mcp skills planMode subagents streamJsonInput websearch vision`, sandbox = permission modes (`default`, `acceptEdits`, `plan`, `bypassPermissions` — the last one never auto-selected), prompt protocol per kind, `cliVersionRange: ">=2.1.0 <3"`, `updateSources` (GitHub releases + docs changelog), paths (`CLAUDE.md`, `.claude/skills`, `.claude/commands`, `.claude/settings.json`).
-- `AuthProbe`: run `claude` with a quota-free status command "(verify exact command: `claude /status` non-interactive or `claude auth status`)"; parse plan/login; never read `~/.claude` credential files.
-- `Launcher.interactive`: argv `claude` (+ `--model`, `--permission-mode`, optional `--resume <id>`); `preLaunchFiles`: project-local `.claude/settings.json` hooks block pointing every relevant hook (`PreToolUse`, `PermissionRequest`, `PostToolUse`, `Notification`, `Stop`, `SessionStart`, `SessionEnd`, `UserPromptSubmit`, `ExitPlanMode`/plan-related "(verify names)") at `curl`-free hook commands: a tiny bundled Node script `orch-hook.mjs` that POSTs `stdin` JSON to `$ORCH_HOOK_URL/claude/$ORCH_SESSION_ID/<hook>` and prints the response JSON (so `PreToolUse` decisions come back through the official hook response). MCP config for the delegation server (M2-05) is a placeholder here.
-- `Launcher.headless`: `claude -p "<goal>" --output-format stream-json --verbose --max-turns N --model … --permission-mode …` with `--allowedTools`/`--disallowedTools` from the task spec "(verify flags)"; stdin closed.
-- `TelemetryParser`: hook bodies → `prompt_opened` (permission/question/plan), `tool_call/result`, `message`, `exit`; stream-json lines → `message`, `tool_call`, `usage`, `exit`; `Notification` kinds (`agent_needs_input`, `permission_prompt`, `quota_auto_resume_*`) → prompts/usage events; unknowns → `unknown`.
+- Manifest v0 (`manifest.json`): models (Sonnet/Opus/Fable ids as listed by the CLI — `EM-CLAUDE-11`), features `hooks mcp skills planMode subagents streamJsonInput websearch vision`, sandbox = permission modes (`default`, `acceptEdits`, `plan`, `bypassPermissions` — the last one never auto-selected), prompt protocol per kind **keyed by execution mode** (`interactive-pty` vs `headless`), `cliVersionRange: ">=2.1.0 <3"`, `updateSources` (GitHub releases + docs changelog), paths (`CLAUDE.md`, `.claude/skills`, `.claude/commands`, `.claude/settings.json`).
+- `AuthProbe`: quota-free status probe (exact command per `EM-CLAUDE-10`); parse plan/login; never read `~/.claude` credential files.
+- `Launcher.interactive`: argv `claude` (+ `--model`, `--permission-mode`, optional `--resume <id>`); `preLaunchFiles`: project-local `.claude/settings.json` hooks block registering **only the hooks in the §4.2 evidence table** at `curl`-free hook commands: a tiny bundled Node script `orch-hook.mjs` that POSTs `stdin` JSON to `$ORCH_HOOK_URL/claude/$ORCH_SESSION_ID/<hook>` and prints the response JSON (so `PreToolUse` decisions come back through the official hook response). MCP config for the delegation server (M2-05) is a placeholder here.
+- `Launcher.headless`: `claude -p "<goal>" --output-format stream-json --verbose --max-turns N --model … --permission-mode …` with `--allowedTools`/`--disallowedTools` from the task spec (`EM-CLAUDE-12`), **plus `--permission-prompt-tool <mcpToolName>`** and an MCP config pointing at `orch mcp serve` (see §4.4). Headless runs are launched with the permission host by default; a run explicitly configured without one is marked `permissionHost: 'none'` and its capability state for approvals is `unsupported` for that run.
+- **Permission host** (`orch mcp serve`, new in this step, minimal): a local stdio MCP server exposing one tool that Claude Code calls when a tool needs approval. The call arrives with the tool name and input; the daemon opens an `AgentPrompt` and the MCP **result** carries the decision (allow/deny, and for the two answer-carrying tools the rewritten input). This is the only approval channel in headless mode.
+- `TelemetryParser`: hook bodies → `prompt_opened` (permission / question / plan, discriminated by `tool_name`), `tool_call/result`, `message`, `exit`; stream-json lines → `message`, `tool_call`, `usage`, `exit`; `Notification` payloads → prompts/usage events (`EM-CLAUDE-04`); unknowns → `unknown`.
 - `RateLimitParser`: stream-json error objects / stderr with rate-limit or usage-limit text + reset hints → `RateLimitSignal` (confidence `official` when a reset timestamp is present, else `estimate`).
-- `PaneController`: `sendCommand` for slash commands (`/model`, `/clear`, `/compact`, `/status`, custom commands from `.claude/commands`) with ack detection from hooks/stream (`UserPromptSubmit` or output echo within timeout); `switchModel` via `/model <id>`; `answerPrompt`: `hook-response` (held HTTP response for the pending hook, decision `allow|deny|ask`, `updatedInput` unsupported in v1), `AskUserQuestion` answer via the hook's structured response "(verify)", plan approval via `ExitPlanMode` hook response, fallback `send-keys-acked` using keystroke maps from `fixtures/keys.yaml`.
+- `PaneController`: `sendCommand` for slash commands (`/model`, `/clear`, `/compact`, `/status`, custom commands from `.claude/commands`) with ack detection from hooks/stream (`UserPromptSubmit` event, `EM-CLAUDE-05`); `switchModel` via `/model <id>`; `answerPrompt` per §4.2 — `hook-response` (interactive) or `mcp-result` (headless) as the primary transports, `send-keys` with a declared ack event as the last resort, which per M1-11 ends in `delivery_uncertain` when no ack event is declared for that prompt kind.
 - Fixtures recorded with `orch fixtures record claude` (M1-08 tool; a manual capture script suffices for this step's first pass).
 - Contract tests + parser fuzz.
 ### Out of scope (deferred)
@@ -40,15 +53,70 @@ export const claudeAdapter: ProviderAdapter = { id: 'claude', manifest, auth: ne
 
 // hook script contract (bundled at packages/providers/claude/bin/orch-hook.mjs)
 // stdin: hook JSON from Claude Code; env: ORCH_HOOK_URL, ORCH_SESSION_ID; argv[2]: hook name
-// stdout: JSON response returned by daemon (e.g. {"hookSpecificOutput":{"permissionDecision":"allow"}}) ; exit code per Claude hook semantics (verify)
+// stdout: JSON response returned by daemon (e.g. {"hookSpecificOutput":{"permissionDecision":"allow"}}) ; exit code per Claude hook semantics (EM-CLAUDE-06)
 ```
-Prompt protocol (manifest excerpt):
+
+#### Evidence table — every Claude surface this step relies on
+No hook name, field or flag may be used in code unless it appears here **and** its M0-09 row is filled. Rows start `unverified`; a row that stays `unverified` at step start disables the capability it backs (per `00-foundations/14-provider-evidence-matrix.md`), it does not block the adapter.
+
+| Row | Surface | Used for | Mode | State at plan time |
+|---|---|---|---|---|
+| `EM-CLAUDE-01` | hook `PreToolUse` — request body shape (`tool_name`, `tool_input`, session id) | every permission prompt; also the carrier for the two answer tools | interactive-pty | unverified |
+| `EM-CLAUDE-02` | hook `PreToolUse` response — `hookSpecificOutput.permissionDecision` (`allow`/`deny`/`ask`) + `permissionDecisionReason` | allow/deny/defer for ordinary tools | interactive-pty | unverified |
+| `EM-CLAUDE-03` | hook `PreToolUse` response — `updatedInput` (exact key and shape) | answering `AskUserQuestion`; recording the `ExitPlanMode` verdict | interactive-pty | unverified |
+| `EM-CLAUDE-04` | hook `Notification` — payload kinds actually emitted | "agent needs input" signal, quota notices | interactive-pty | unverified |
+| `EM-CLAUDE-05` | hook `UserPromptSubmit` — fires on programmatic input | ack for `sendCommand` | interactive-pty | unverified |
+| `EM-CLAUDE-06` | hook exit-code / timeout semantics for `orch-hook.mjs` | non-blocking failure behaviour | both | unverified |
+| `EM-CLAUDE-07` | hooks `PostToolUse`, `Stop`, `SessionStart`, `SessionEnd` — availability and shape | tool results, turn boundaries, lifecycle | interactive-pty | unverified |
+| `EM-CLAUDE-08` | tool `AskUserQuestion` — input schema (options) and how an answer is expressed | question prompts | both | unverified |
+| `EM-CLAUDE-09` | tool `ExitPlanMode` — input schema (plan text) and how approve/reject is expressed | plan approval | both | unverified |
+| `EM-CLAUDE-10` | quota-free auth/status command | `AuthProbe` | headless | unverified |
+| `EM-CLAUDE-11` | model ids as listed by the CLI | manifest `models` | headless | unverified |
+| `EM-CLAUDE-12` | `-p` flags: `--output-format stream-json`, `--verbose`, `--max-turns`, `--allowedTools`/`--disallowedTools` | headless launcher | headless | unverified |
+| `EM-CLAUDE-13` | `--permission-prompt-tool` — flag name, the MCP tool contract it expects, and the result shape that grants/denies | headless approvals | headless | unverified |
+| `EM-CLAUDE-14` | behaviour of a headless run with **no** permission host when a tool needs approval | the negative case (expected: tool denied, run continues) | headless | unverified |
+
+Prompt protocol (manifest excerpt) — **keyed by execution mode**, because the transports genuinely differ:
 ```json
-{ "promptProtocol": { "permission": { "source": "hook:PreToolUse|PermissionRequest", "answerTransport": "hook-response", "fallback": "send-keys-acked", "deadlineMs": 60000 },
-  "question": { "source": "hook:AskUserQuestion", "answerTransport": "hook-response", "fallback": "send-keys-acked" },
-  "planApproval": { "source": "hook:ExitPlanMode", "answerTransport": "hook-response", "fallback": "send-keys-acked" },
-  "login": { "source": "process:stderr", "answerTransport": "none" } } }
+{ "promptProtocol": {
+  "permission": {
+    "interactive-pty": { "source": "hook:PreToolUse",            "answerTransport": "hook-response",
+                         "answerField": "hookSpecificOutput.permissionDecision",
+                         "ackEvent": "hook:PostToolUse", "deadlineMs": 60000, "onDeadline": "ask",
+                         "fallback": { "transport": "send-keys", "ackEvent": "hook:PostToolUse" } },
+    "headless":        { "source": "mcp:permission-prompt-tool", "answerTransport": "mcp-result",
+                         "ackEvent": "mcp:result-consumed", "deadlineMs": 60000, "onDeadline": "deny",
+                         "fallback": null,
+                         "requires": "permissionHost",
+                         "withoutHost": "unsupported" } },
+  "question": {
+    "interactive-pty": { "source": "hook:PreToolUse", "toolName": "AskUserQuestion",
+                         "answerTransport": "hook-response", "answerField": "updatedInput",
+                         "ackEvent": "hook:PostToolUse",
+                         "fallback": { "transport": "send-keys", "ackEvent": null } },
+    "headless":        { "source": "mcp:permission-prompt-tool", "toolName": "AskUserQuestion",
+                         "answerTransport": "mcp-result", "requires": "permissionHost",
+                         "withoutHost": "unsupported" } },
+  "planApproval": {
+    "interactive-pty": { "source": "hook:PreToolUse", "toolName": "ExitPlanMode",
+                         "answerTransport": "hook-response", "answerField": "updatedInput",
+                         "editSupport": "plan-text", "ackEvent": "hook:PostToolUse",
+                         "fallback": { "transport": "send-keys", "ackEvent": null } },
+    "headless":        { "source": "mcp:permission-prompt-tool", "toolName": "ExitPlanMode",
+                         "answerTransport": "mcp-result", "requires": "permissionHost",
+                         "withoutHost": "unsupported" } },
+  "login": { "interactive-pty": { "source": "process:stderr", "answerTransport": "none" },
+             "headless":        { "source": "process:stderr", "answerTransport": "none" } } } }
 ```
+`"fallback": { "transport": "send-keys", "ackEvent": null }` is deliberate and the UI must show it: a keystroke answer with no declared ack event resolves to **`delivery_uncertain`**, never `acknowledged` (M1-11 rule). Echoed text in the pane is not an ack.
+
+**Answer states produced by this adapter** (definitions owned by M1-11):
+| Transport | Reaches `acknowledged` when | Otherwise |
+|---|---|---|
+| `hook-response` | the held hook response is consumed and the matching `PostToolUse`/tool-result arrives for the same `tool_use_id` | response delivery failed → `submitted`, then `expired` at deadline |
+| `mcp-result` | the MCP call returns and the CLI proceeds on that tool | call already timed out on the CLI side → `expired` |
+| `send-keys` (no declared ack) | never | `delivery_uncertain` immediately after the keystrokes are written |
+| deadline reached with no answer | — | `expired`; interactive: the CLI falls back to its own native prompt and the card stays answerable via keystrokes (`delivery_uncertain`); headless: the tool is denied |
 ### 4.3 Data / schema changes
 None (uses `sessions`, `events`, `agent_prompts` via M1-11).
 ### 4.4 Infrastructure

@@ -2,6 +2,7 @@
 name: orchestra-builder
 description: Sonnet-tier builder for Orchestra's mechanical steps (tier C in plan/AGENT_ROUTING.md) and sub-tasks handed down by the orchestrator — YAML catalogs, JSON manifests, read-only UI screens from a spec, docs pages, CLI command wiring, i18n strings, test files from a given table, boilerplate components. Use when the work is fully specified and needs no design decisions.
 model: sonnet
+effort: medium
 tools: Read, Edit, Write, Bash, Grep, Glob
 ---
 You produce exactly what the step file or the orchestrator's task description specifies. No design decisions.

@@ -53,7 +53,7 @@ Package names: `@orchestra/core`, `@orchestra/sdk`, `@orchestra/catalog`, `@orch
 None.
 ### 4.4 Infrastructure
 `.dependency-cruiser.cjs` rules (names used in CI output):
-- `core-imports-nothing`: `packages/core/**` may not import outside itself.
+- `core-allowed-deps`: `packages/core/**` may import **only** itself, `neverthrow` and `zod`. Nothing else — no other package, no workspace sibling, and **no node builtins** (`node:*`). This is the single definition of the core boundary; M0-02 needs `neverthrow` (`Result`) and `zod` (value-object and event schemas) at *runtime*, so "core imports nothing" was never achievable and is replaced by this explicit allowlist. Enforced as `allowed`/`forbidden` pairs so an added dependency fails rather than silently passing.
 - `sdk-only-core`: `packages/sdk/**` → only `packages/core`.
 - `providers-only-sdk`: `packages/providers/*/**` → only `packages/sdk` (+ own package).
 - `daemon-layering`: `apps/daemon/src/core|application/**` ↛ `infrastructure|interface`.
@@ -84,7 +84,9 @@ None.
 |---|---|---|---|
 | UT-M0-01-01 | unit | each package has a passing smoke test | `pnpm test` green, 12 packages reported |
 | AT-M0-01-02 | architecture | `pnpm depcruise` on clean tree | 0 violations |
-| AT-M0-01-03 | architecture | scratch file in `packages/core` importing `node:fs` | `core-imports-nothing` violation reported, exit ≠ 0 |
+| AT-M0-01-03 | architecture | scratch file in `packages/core` importing `node:fs` | `core-allowed-deps` violation reported, exit ≠ 0 |
+| AT-M0-01-03b | architecture | scratch file in `packages/core` importing `zod` and `neverthrow` | **0 violations** — the two allowed runtime deps are not a boundary breach |
+| AT-M0-01-03c | architecture | scratch file in `packages/core` importing `@orchestra/sdk` | `core-allowed-deps` violation |
 | AT-M0-01-04 | architecture | scratch import of `apps/daemon` from `apps/web` | `web-no-daemon` violation |
 | IT-M0-01-05 | toolchain | `pnpm build` from clean clone on Node 22 | success; `dist/` per package |
 | IT-M0-01-06 | toolchain | commit with message `bad message` | commitlint rejects |
@@ -94,14 +96,14 @@ None.
 |---|---|---|---|---|
 | TC-M0-01-01 | Clean clone builds | 1. `git clone` to a temp dir 2. `fnm use` 3. `pnpm install` 4. `pnpm build && pnpm lint && pnpm test && pnpm depcruise` | all four green, no warnings about Node version | ⬜ |
 | TC-M0-01-02 | Wrong Node version refused | 1. `fnm use 26` 2. `pnpm install` | pnpm/engines check fails with a clear message naming Node 22 | ⬜ |
-| TC-M0-01-03 | Layer violation caught | 1. add `import fs from 'node:fs'` in `packages/core/src/index.ts` 2. `pnpm depcruise` | fails, rule `core-imports-nothing` named; revert | ⬜ |
+| TC-M0-01-03 | Core boundary caught | 1. add `import fs from 'node:fs'` in `packages/core/src/index.ts` 2. `pnpm depcruise` 3. replace it with `import { z } from 'zod'` 4. `pnpm depcruise` | step 2 fails naming rule `core-allowed-deps`; step 4 passes with 0 violations; revert | ⬜ |
 | TC-M0-01-04 | Commit hooks | 1. stage a badly formatted file 2. `git commit -m "feat: x"` | lint-staged formats it; commit succeeds; `git commit -m "x"` is rejected | ⬜ |
 | TC-M0-01-05 | Governance files present | 1. open repo root | LICENSE, CONTRIBUTING (DCO), CODE_OF_CONDUCT, SECURITY, CODEOWNERS, docs/adr/ADR-001, ADR-003 exist and render | ⬜ |
 
 ## 7. Acceptance criteria
 - [ ] All packages from `11-repo-layout.md` exist and compile with strict settings.
 - [ ] `pnpm build/lint/test/typecheck/depcruise` green locally.
-- [ ] Six dependency-cruiser rules present and proven by negative tests.
+- [ ] Six dependency-cruiser rules present and proven by negative **and positive** tests — `core-allowed-deps` must reject a node builtin and a sibling package while accepting `neverthrow` and `zod`.
 - [ ] Node 22 pinned in `.nvmrc`, `engines`, `packageManager` set.
 - [ ] Conventional commits enforced by hook.
 - [ ] Governance placeholders + ADR-001/ADR-003 committed.

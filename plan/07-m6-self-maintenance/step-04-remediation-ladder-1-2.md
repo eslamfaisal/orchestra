@@ -46,7 +46,7 @@ After this step a classified `RepairCase` is repaired by the platform itself. A 
 | 1 | `ReloadManifest` | manifest-stale, parser-drift, hooks-unregistered | `safe-auto` | a cached manifest version ≠ active satisfies the installed CLI version | 2 s |
 | 2 | `ReRegisterHooksAndMcp` | hooks-unregistered, parser-drift | `safe-auto` | ≥ 1 running session with feature `hooks`/`mcp`; `paths.hooksConfig`/`mcpConfig` present in the manifest | 2 s |
 | 3 | `SwitchTransport` | transport-broken | `safe-auto` | manifest declares ≥ 2 transports for the failing command and the alternative is documented (ADR-009) | 2 s |
-| 4 | `RestartPaneAndResume` | transport-broken, hooks-unregistered | `safe-auto` | `manifest.limits.resume === true`; session state ∈ {running, waiting_for_input, crashed}; no unanswered prompt younger than 30 s | 6 s |
+| 4 | `RestartPaneAndResume` | transport-broken, hooks-unregistered | `safe-auto` | `manifest.limits.resume === true`; session state ∈ {running, waiting_for_input, crashed}; no unresolved prompt of any age; verified quiescent replay-safe checkpoint; old execution fenced | 6 s |
 | 5 | `RerouteTask` | model-missing, auth-drift, transport-broken | `safe-auto` | the case has a `taskId`; ≥ 1 alternative candidate from M2-04 with a healthy quota window | 4 s |
 | 6 | `RollbackPluginOrManifest` | manifest-stale, parser-drift | `safe-auto` | `lastKnownGood` non-empty and the active manifest arrived from the registry | 3 s |
 | 7 | `RegistryFix` | manifest-stale, parser-drift, model-missing | `registry` | `maintenance.registry.enabled` and a satisfying candidate newer than active | 30 s |
@@ -57,13 +57,13 @@ Rules (each a branch in `plan()`, all unit-tested):
 - **R-L3 Step separation.** All `safe-auto` descriptors run first (ladder step 1). Only if every one of them failed or was inapplicable does the plan advance to `registry` (ladder step 2). `assisted` is never planned here — the ladder returns `handoff: 3`.
 - **R-L4 Auth is never auto-fixed.** `auth-drift` may only plan `RerouteTask` (move work to another provider). Logging a user in, refreshing a token, touching a credential store or opening a login flow is **not a strategy and never will be** (C3, C12).
 - **R-L5 No keystrokes without a documented transport.** `RestartPaneAndResume` and `SwitchTransport` act through `SessionSupervisor`/`PaneController` only; if the resume path is not declared in the manifest (`limits.resume`), the strategy is inapplicable, not "best effort".
-- **R-L6 Never destroy work.** `RestartPaneAndResume` refuses when the session has an unanswered `AgentPrompt` opened less than 30 s ago or an in-flight tool call; the worktree is never cleaned, the branch never reset, the recording never truncated.
+- **R-L6 Never destroy work.** `RestartPaneAndResume`, `SwitchTransport` and `RerouteTask` refuse when there is any unresolved prompt, in-flight call, stale/missing telemetry, uncertain external effect or unfenced old execution; the worktree is never cleaned, the branch never reset, the recording never truncated.
 - **R-L7 Loop guard.** `maxLadderRunsPerCase` (3). Run *n* is separated from *n−1* by `backoffMs[n] = [30_000, 120_000, 600_000]`. After 3 runs ⇒ `needs_human`, no further automatic attempts for that fingerprint until it is closed.
 - **R-L8 One at a time.** A per-case mutex plus a host-wide `MaintenanceLock` (held by a ladder run, by a canary run in M6-05, and by a manifest apply in M6-03) — a strategy never runs while another maintenance action is in flight.
 - **R-L9 Verify, then close.** An attempt is `applied` only when verification passes; otherwise it is `failed` and the plan advances. The case closes as `fixed` (reason `remediated`) with `ttrMs = fixedAt − classifiedAt`.
 - **R-L10 Budget = truth.** Exceeding a strategy's budget aborts that attempt (`outcome: 'timeout'`) and is recorded; the whole safe-auto run is additionally capped at `ladderTimeoutMs` (10 000 ms) so the SLO cannot be met by "eventually".
 
-Verification per kind (`VerificationSpec`, resolved by the executor): `manifest-stale` → re-run Doctor checks `binary.version_in_range`, `probe.help_commands`, `manifest.signature`; `parser-drift` → re-parse the stored failing payloads from `case.evidence.signals[].detail.raw` through the *new* `TelemetryParser` (offline, no session needed) and require zero `ParseError`; `hooks-unregistered` → Doctor `hooks.registered`/`mcp.registered`; `transport-broken` → a live `PaneController.sendCommand(noop)` ack within `ackTimeoutMs`, or a healthy session start for `RerouteTask`; `model-missing` → the routing decision names a model present in the active manifest; `auth-drift` → Doctor `auth.status`.
+Verification per kind (`VerificationSpec`, resolved by the executor): `manifest-stale` → re-run Doctor checks `binary.version_in_range`, `probe.help_commands`, `manifest.signature`; `parser-drift` → re-parse the stored failing payloads from `case.evidence.signals[].detail.raw` through the *new* `TelemetryParser` (offline, no session needed) and require zero `ParseError`; `hooks-unregistered` → Doctor `hooks.registered`/`mcp.registered`; `transport-broken` → a documented side-effect-free health check with a correlated response within `ackTimeoutMs`, or a healthy session start for `RerouteTask`; `model-missing` → the routing decision names a model present in the active manifest; `auth-drift` → Doctor `auth.status`.
 
 ### 4.2 Interfaces / contracts
 ```ts
@@ -159,6 +159,9 @@ doctor.drift_detected(caseId)
  → release lock (always, incl. crash path via shutdown hook)
 ```
 
+### 4.7 Review reconciliation contract (2026-09-15)
+Mutating recovery strategies require a persisted checkpoint, fresh authoritative quiescence, no unresolved delivery and a replay-safe action contract. Acquire exclusive session ownership; revoke/fence the previous generation before a new process or provider is admitted. If provider-side fencing or reconciliation cannot establish that the old execution stopped, escalate to human. A transport change to exec or another provider is a new execution with an explicit handoff package; hidden state and approvals do not transfer. Metadata-only repair may continue while execution recovery is blocked. The 10-second SLO covers eligible known repairs only; report escalation/timeout rates separately.
+
 ## 5. Tasks
 - [ ] `packages/core/src/maintenance/remediation/`: `StrategyId`, `SafetyClass`, `RemediationStrategyDescriptor`, `LadderContext`, `LadderPlan`, `PreconditionId`, `SkipReason`.
 - [ ] Pure `plan()` + `nextBackoffMs()` implementing R-L1…R-L3, R-L7; golden table per `DriftKind`; drive to 100 % branch coverage.
@@ -213,7 +216,14 @@ doctor.drift_detected(caseId)
 | TC-M6-04-10 | Manual retry & dry ladder | 1. Set `autoApply: false`. 2. Trigger a case; run `orch repair plan <caseId>`. 3. `orch repair retry <caseId> --strategy ReloadManifest`. | With `autoApply: false` nothing runs automatically; `plan` prints the ordered attempts with preconditions; the manual retry executes exactly one strategy, audited with `actor.kind: user` | ⬜ |
 | TC-M6-04-11 | No work destroyed (R-L6) | 1. Open a prompt in a FakeProvider session (leave it unanswered). 2. Force `transport-broken`. | `RestartPaneAndResume` is skipped with reason `UnansweredPromptTooRecent`; after 30 s + answer it may run; the worktree diff and the recording file are byte-identical before/after the restart | ⬜ |
 
+### 6.3 Review regression scenarios
+- [ ] Old unanswered prompt (>30 seconds) still blocks restart.
+- [ ] Missing telemetry with potentially completed external action blocks restart/reroute.
+- [ ] Old process resumes after ownership transfer: generation rejected; uncertain provider activity escalated.
+- [ ] Known quiescent checkpoint can recover once; no duplicate external effects.
+
 ## 7. Acceptance criteria (Definition of Done)
+- [ ] The review reconciliation contract and all §6.3 regression scenarios pass; archive evidence alongside the original test cases.
 - [ ] All TC-M6-04-01 … 11 pass and are recorded with build hash and date.
 - [ ] `RemediationLadder.plan()`, `nextBackoffMs()` and `ForbiddenPathGuard` have **100 % branch coverage** (CI gate).
 - [ ] p95 `ttrMs` for ladder-1 strategies over ≥ 10 injected cases is **< 10 000 ms**; every attempt stays inside its declared budget (TC-02).

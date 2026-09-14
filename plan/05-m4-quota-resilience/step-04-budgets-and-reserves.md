@@ -47,7 +47,7 @@ Rules (100 % branch coverage in `budget-ledger.spec.ts`):
 - **R-B3 Unknown limit ⇒ reserve inert.** If the window has no `limit` (R-W4 / R-F7), the reserve cannot be computed and the constraint passes with reason `reserve: not-evaluable`. Reserves never fabricate a limit and never block on a guess.
 - **R-B4 Estimated cost.** `estimatedCost(task)` comes from `outcomes` for `(model, taskType)` when `sampleCount ≥ 3`, else from the taxonomy's `defaultBudget` (`06-intelligence-layer.md` §1), and carries `source: 'outcomes' | 'taxonomy-default'`. Same estimator as M4-06 — one implementation, two callers.
 - **R-B5 Breach is a state, not an event storm.** `breached = remaining < reservedUnits`. `quota.reserve_breached` is emitted on the transition into `breached` only; re-entry requires leaving the state (with the same `hysteresisPp` as M4-02).
-- **R-B6 Mission caps are cumulative and hard.** A mission's `usedTokens` and `elapsedMs` accumulate from `task_results.usage_json` and session durations. At `≥ 100 %` of any cap the mission scheduler stops starting new tasks (`mission.state` stays `executing`, `budget_paused = true`); running tasks are **not** killed.
+- **R-B6 Mission caps are cumulative admission limits (ADR-021).** A mission's `usedTokens` and `elapsedMs` accumulate from `task_results.usage_json` and session durations. At `≥ 100 %` of any cap the mission scheduler stops starting new tasks (`mission.state` stays `executing`, `budget_paused = true`); running tasks are **not** killed.
 - **R-B7 Warn before stop.** At `warnAtPct` (default 80) of a mission cap the ledger reports `level: 'warn'` and the UI banner appears; at 100 % `level: 'exhausted'` and the pause takes effect.
 - **R-B8 Precedence.** Budgets merge task > mission > workspace > org > defaults (the M2-09 layering); the **most restrictive reserve wins** when two layers define one for the same `(provider, window)`. Merge is pure and unit-tested.
 - **R-B9 Total function.** The ledger never throws, never returns negative `remaining` or `reservedUnits`, and handles `limit = 0`, `reservePct = 0`, `reservePct = 100` (⇒ provider usable only by the exempt task types).
@@ -165,6 +165,9 @@ task.result_submitted | session.stopped ─▶ MissionUsageRepository.addTaskUsa
 POST /missions/:id/budget/resume ─▶ preview ─▶ apply ─▶ mission.budget_resumed ─▶ scheduler resumes
 ```
 
+### 4.7 Review reconciliation contract (2026-09-15)
+Admission is an atomic ledger operation: observed spend + existing in-flight reservations + the candidate estimate must fit the configured cap in the same unit. Persist reservation per task attempt, settle once and release unused estimates only after reconciliation. Late/missing accounting leaves a conservative reservation or pauses admission according to policy. Display observed spend, reserved estimate, unknown usage and overshoot separately. Reservations are estimates, not an external billing guarantee; in-flight consumption, cancellation delay and other clients can exceed them. Unknown comparable costs use explicit pause/manual policy; never subtract tokens from percentages or credits. Organization caps/reserve floors cannot be weakened by task overrides.
+
 ## 5. Tasks
 - [ ] `packages/catalog/schemas/budgets.schema.ts` (`ReservePolicy`, `MissionBudgetPolicy`, `BudgetsPolicy`) + example in `examples/policies/budgets.yaml`.
 - [ ] `packages/core/src/policy/budgets/`: `evaluateReserve`, `evaluateMissionBudget`, `mergeBudgets` implementing R-B1…R-B9; 100 % branch tests.
@@ -212,7 +215,14 @@ POST /missions/:id/budget/resume ─▶ preview ─▶ apply ─▶ mission.budg
 | TC-M4-04-07 | Restart while paused and breached | 1. With a mission budget-paused and a reserve breached, `kill -9` the daemon. 2. Restart. 3. Read `GET /fleet/budgets` and `GET /missions/:id/budget`. | Same breach episode (same `episodeId`, no new event), same `budgetPaused: true`, scheduler still skips the mission; resuming works normally afterwards. | ⬜ |
 | TC-M4-04-08 | Real provider, observed safely | 1. Do not provoke a rate limit (C5). 2. During normal work on Codex, set a small review reserve and watch `GET /fleet/budgets` as the real window fills. | The reserve status tracks the real `used`/`limit` (or reports `not-evaluable` when the vendor gives no limit), the breach fires only once at the transition, and every number in the payload and UI carries `confidence: "estimate"`. | ⬜ |
 
+### 6.3 Review regression scenarios
+- [ ] Two concurrent admissions cannot spend the same remaining reservation.
+- [ ] Late usage exceeds reservation: show overshoot and pause new admission.
+- [ ] Missing estimate or mismatched units is not treated as zero cost.
+- [ ] Crash/retry settles a reservation once; active task cancellation is not advertised as immediate.
+
 ## 7. Acceptance criteria (Definition of Done)
+- [ ] The review reconciliation contract and all §6.3 regression scenarios pass; archive evidence alongside the original test cases.
 - [ ] `evaluateReserve`, `evaluateMissionBudget` and `mergeBudgets` reach **100 % branch coverage**; no output is negative, `NaN` or `Infinity`.
 - [ ] A breached review reserve excludes non-review tasks from that provider and never excludes the task types it protects (AT-M4-04-02, TC-M4-04-01); a breached Lead reserve never blocks a `role: lead` session.
 - [ ] A window with no known `limit` makes the reserve `not-evaluable` and changes no routing decision — nothing is fabricated (TC-M4-04-05).

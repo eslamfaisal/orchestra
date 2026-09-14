@@ -2,6 +2,7 @@
 name: orchestra-tester
 description: Sonnet-tier test writer/runner for Orchestra. Given a step file, writes the automated tests listed in §6.1 that are still missing (unit, application with in-memory repos, contract with fixtures, integration, Playwright E2E with FakeProvider), runs the suite, and reports failures with the shortest decisive output. Use after an implementer finishes, or to raise coverage.
 model: sonnet
+effort: medium
 tools: Read, Edit, Write, Bash, Grep, Glob
 ---
 You write and run tests for one Orchestra step. You do not change production code.

@@ -125,6 +125,9 @@ Live session: WS timeline.<sid> item.appended ──▶ append to lanes ──�
 Copy replay link ──▶ /timeline/:sid?t=<playerSec>&ts=<iso> (both, so the link survives re-recording)
 ```
 
+### 4.7 Review reconciliation contract (2026-09-15)
+Timeline replay includes captured terminal/events and commit-based diffs. Resolve a historical diff only from recorded base/head commit IDs or an explicit snapshot ID with content hash and capture time. Worktree existence is not historical evidence. Without a snapshot, show "Uncommitted state not captured"; never display the current worktree as historical state. Show redaction gaps, unavailable transcript fields and missing segments explicitly.
+
 ## 5. Tasks
 - [ ] `packages/core/src/timeline/`: `SessionClock`, `TimelineItem`, `Moment`, clamping/gap rules (100 % branch coverage).
 - [ ] `WorktreeHistoryPort` + `TimelineError` union in `packages/core/src/ports/`.
@@ -174,7 +177,13 @@ Copy replay link ──▶ /timeline/:sid?t=<playerSec>&ts=<iso> (both, so the l
 | TC-M5-04-11 | Live session follow mode | 1. Open Timeline for a *running* session. 2. Enable "follow live". 3. Let the agent produce output, then disable follow and scrub back. | Follow mode shows the live terminal and appends lane items as they happen; disabling switches to the recording at the same instant without losing the scroll position | ⬜ |
 | TC-M5-04-12 | RTL + reduced motion | 1. Switch UI to Arabic. 2. Enable `prefers-reduced-motion` in the OS. 3. Repeat TC-02. | Lanes and panes mirror correctly; tooltips read RTL; no animated scrubber easing; keyboard shortcuts unchanged | ⬜ |
 
+### 6.3 Review regression scenarios
+- [ ] Modify an uncommitted file twice: earlier content unavailable without snapshot.
+- [ ] Existing worktree with no checkpoint never supplies a historical diff.
+- [ ] Recorded checkpoint hash matches replayed content; gaps are visible.
+
 ## 7. Acceptance criteria (Definition of Done)
+- [ ] The review reconciliation contract and all §6.3 regression scenarios pass; archive evidence alongside the original test cases.
 - [ ] All TC-M5-04-01 … 12 pass on real Claude Code and Codex sessions.
 - [ ] Seeking from any of the four surfaces (scrubber, player, transcript, events) leaves all panes describing the same instant (TC-02, TC-03).
 - [ ] `SessionClock` at 100 % branch coverage; round-trip property test green.

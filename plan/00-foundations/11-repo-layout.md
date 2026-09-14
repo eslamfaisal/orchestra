@@ -26,7 +26,7 @@ orchestra/
 ```
 
 ## Dependency rules (dependency-cruiser)
-- `packages/core` → nothing (not even `sdk`).
+- `packages/core` → itself, `neverthrow`, `zod` — nothing else (not even `sdk`), and no node builtins. Enforced by the dependency-cruiser rule `core-allowed-deps` (M0-01 §4.4).
 - `packages/sdk` → `core` types only.
 - `packages/providers/*` → `sdk` only (never `daemon`, never each other).
 - `apps/daemon/core|application` → `packages/core`, `packages/sdk` types; never `infrastructure`.

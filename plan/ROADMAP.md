@@ -6,19 +6,21 @@ Effort = working days for one engineer driving AI coding agents. Steps marked �
 
 | Milestone | Theme | Steps | Effort | Exit criteria (short) | You can test… |
 |---|---|---|---|---|---|
-| **M0** | Foundation (MVP part 1) | 8 | ~17 d | daemon boots, web shell loads, FakeProvider session runs end-to-end in CI, all quality gates green | daemon health, web nav, fake session via API |
-| **M1** | MVP: Live fleet (MVP part 2) | 13 | ~36 d | ≥ 2 real CLIs live in tmux + worktrees, terminals in browser, prompts answered from web, Quick Delegate returns a branch | **the MVP** on real Claude Code + Codex (+ agy opt-in) |
+| **M0** | Foundation (MVP part 1) | 9 | ~20 d | daemon boots, web shell loads, FakeProvider session runs end-to-end in CI, all quality gates green, **provider evidence matrix filled for Claude Code + Codex on real CLIs (M0-09)** | daemon health, web nav, fake session via API, real-CLI feasibility experiments |
+| **M1** | MVP: Live fleet (MVP part 2) | 13 | ~38 d | Claude Code + Codex live in tmux + worktrees, terminals in browser, prompts with a verified/limited capability record answered from web (manual-only kinds shown as such), Quick Delegate returns a branch | **the MVP** on real Claude Code + Codex (agy only if the ADR-008 gate is resolved) |
 | **M2** | Delegation & intelligence | 9 | ~20 d | task typed → engine assigns provider/model with reasons → runs → Board shows it; Lead can delegate via MCP | auto-assignment, Board, Chat |
-| **M3** | Missions, review & merge | 9 | ~22 d | feature → planned, split, implemented per worktree, cross-vendor reviewed, PR opened | full mission on a real repo |
-| **M4** | Quota, budgets, resilience | 7 | ~14.5 d | 429 ⇒ cooling + reroute; forecasts labelled; Lead handoff on exhaustion | simulated + real rate limits |
-| **M5** | History, recording, replay | 6 | ~14 d | replay any session with chat/events/diff linked; daemon restart loses zero prompts | kill -9 daemon mid-prompt |
-| **M6** | Self-maintenance | 7 | ~16 d | simulated CLI drift detected < 60 s, auto-remediated < 10 s, Health shows case | fixture drift injection |
+| **M3** | Missions, review & merge | 9 | ~23 d | feature → planned, split, implemented per worktree, reviewed by an independent model publisher (ADR-022), validated on the recorded commit, PR opened | full mission on a real repo |
+| **M4** | Quota, budgets, resilience | 7 | ~14.5 d | 429 ⇒ cooling + reroute; official observations vs estimates labelled; admission budgets (ADR-021); clear pause when no eligible capacity | simulated + real rate limits |
+| **M5** | History, recording, replay | 6 | ~14 d | replay any session with chat/events/commit-diff linked; daemon restart keeps every persisted prompt with an explicit recovery outcome (M5-05 guarantee matrix) | kill -9 daemon mid-prompt |
+| **M6** | Self-maintenance | 7 | ~16 d | simulated CLI drift detected < 60 s; known drift kinds auto-remediated < 10 s only in verified quiescent state, otherwise human escalation; Health shows case | fixture drift injection |
 | **M7** | Everywhere | 7 | ~15 d | signed/notarized Tauri app with updater; approve a prompt from phone via PWA push | phone approve, app update |
 | **M8** | Customization & skills | 8 | ~18 d | teammate defaults; skill evals feed routing; scorecards from your outcomes | skill install + eval, scorecard |
-| **M9** | Enterprise | 9 | ~22 d | two users with different permissions; audit export passes review; Postgres + Helm deploy | RBAC, OIDC, container |
-| **M10** | Ecosystem & 1.0 | 8 | ~20 d | third-party provider ships without core PR; repair agent proposes a passing fix; 1.0 DoD audit green | 1.0 |
+| **M9** | Enterprise | 9 | ~22 d | trusted shared-team install (ADR-019): two users with different permissions, human-only approval gates; audit export passes review; Postgres + Helm deploy | RBAC, OIDC, container |
+| **M10** | Ecosystem & 1.0 | 8 | ~20 d | third-party (trusted-tier) provider ships without core PR; repair agent proposes a passing fix; 1.0 DoD audit green with ≥ 30-day KPI window | 1.0 |
 
-**MVP = M0 + M1** (~53 d). Everything after is additive.
+**MVP = M0 + M1** (~58 d). Everything after is additive.
+
+**Estimate confidence:** the numbers are step-estimate sums, not delivery forecasts (R21). Provider integration (M0-09, M1-05/06), recovery correctness (M5-05, M6-04), desktop packaging (M7-01/02), enterprise isolation (M9-01) and plugin trust (M10-03) carry a 30 % contingency in `PROGRESS.md` target dates. The ≥ 30-day KPI observation window for M10-08 starts at M8 exit and overlaps M9/M10.
 
 **Git tags at milestone exit:** `m0-foundation`, `mvp-1` (M1), `m2-intelligence`, `m3-missions`, `m4-quota`, `m5-history`, `m6-maintenance`, `m7-everywhere`, `m8-skills`, `m9-enterprise`, `v1.0.0` (M10).
 
@@ -48,6 +50,8 @@ Parallel lanes after M1: {M2→M3} · {M4} · {M5} can proceed concurrently; M6 
 
 ## Step index
 
+Step numbers are stable ids, not the execution order: the **Depends** column is the schedule. A dependency on a later-numbered step is written `after M<x>-<nn>`; `node tools/verify-plan.mjs` rejects any other forward reference, unknown ids, self-references and dependencies on gated steps.
+
 ### M0 — Foundation (`01-m0-foundation/`)
 | ID | Step | Effort | Depends | Scope (one line) |
 |---|---|---|---|---|
@@ -59,6 +63,7 @@ Parallel lanes after M1: {M2→M3} · {M4} · {M5} can proceed concurrently; M6 
 | M0-06 | HTTP API + WS gateway v1 | 2 | M0-05 | REST resources, `/ws` topics, snapshot+delta, auth, OpenAPI |
 | M0-07 | Web shell | 2.5 | M0-06 ∥ | React 19 app, nav/IA, design system, dark theme, RTL, WS client, empty screens, perf baseline |
 | M0-08 | CI & quality gates | 2 | M0-03 ∥ | GH Actions, coverage, custom ESLint rules, egress test, Scorecard, SECURITY.md, CONTRIBUTING (DCO), CODEOWNERS |
+| M0-09 | Provider feasibility gates & evidence matrix | 3 | M0-03 ∥ | human-run on real Claude Code + Codex (pinned versions): approvals incl. `updatedInput`, headless permission host, cancel, resume, usage/rate-limit signals, exit status, tmux lifecycle, adopt-after-restart; fixtures; `docs/providers/evidence-matrix.md` with `verified/limited/manual-only/unsupported/unverified` per operation × execution mode |
 
 ### M1 — MVP: Live fleet (`02-m1-mvp-live-fleet/`)
 | ID | Step | Effort | Depends | Scope |
@@ -67,9 +72,9 @@ Parallel lanes after M1: {M2→M3} · {M4} · {M5} can proceed concurrently; M6 
 | M1-02 | PTY port & SessionSupervisor | 3 | M1-01 | single actor owning tmux state; start/stop/resume/reconcile; concurrency limits; crash recovery |
 | M1-03 | Worktree manager | 2 | M0-04 ∥ | `git worktree` create/remove, branch naming, `.orchestra/worktrees`, scratch repo, cleanup |
 | M1-04 | BinaryRegistry & provider detection | 1.5 | M0-04 ∥ | allowlist, version parse, ranges, boot detection, Fleet health rows |
-| M1-05 | Claude Code adapter v1 | 4 | M1-02, M1-04 | auth probe, launcher (interactive/headless), hooks + stream-json parsers, prompt protocol, fixtures |
-| M1-06 | Codex adapter v1 | 4 | M1-02, M1-04 ∥ | app-server JSON-RPC client, `exec --json`, approvals, model switch, schema fixture |
-| M1-07 | Antigravity adapter v1 (opt-in) | 3 | M1-02, M1-04 ∥ | ToS ack flag, stream-json stdio, hooks, `/usage` probe, fixtures |
+| M1-05 | Claude Code adapter v1 | 5 | M0-09, M1-02, M1-04 | auth probe, launcher (interactive PTY / headless with permission host), `PreToolUse` interception of `AskUserQuestion`/`ExitPlanMode` with `updatedInput`, stream-json parsers, prompt protocol with answer states, fixtures |
+| M1-06 | Codex adapter v1 | 5 | M0-09, M1-02, M1-04 ∥ | app-server JSON-RPC client on a pinned schema fixture, execution-mode labelling, `exec --json` fallback (pending prompts cancelled with reason), approvals, model switch, `account/rateLimits` |
+| M1-07 | Antigravity adapter v1 (opt-in) | 3 | M1-02, M1-04 ∥ | **gated** (ADR-008 amended: terms resolution + M0-09 agy evidence row; nothing downstream depends on it): ToS ack flag, stream-json stdio, hooks, soft-deny detection, `/usage` probe (unverified), fixtures |
 | M1-08 | Telemetry plane & fixture recorder | 2.5 | M1-05 | hooks receiver, parser pipeline, normalization, `orch fixtures record` |
 | M1-09 | Terminals grid UI | 3 | M1-02, M0-07 | xterm WebGL, raw WS `/term`, resize, headers, broadcast, attach-externally, budgets |
 | M1-10 | Fleet screen v1 + start session | 2 | M1-04, M0-07 | providers/auth/versions, sessions list, start-session dialog (provider, model, repo, worktree) |
@@ -82,7 +87,7 @@ Parallel lanes after M1: {M2→M3} · {M4} · {M5} can proceed concurrently; M6 
 |---|---|---|---|---|
 | M2-01 | Task taxonomy catalog | 2 | M1-13 | YAML taxonomy + Zod schema + loader + hot reload + validation CLI |
 | M2-02 | Model catalog & profiles v1 | 2.5 | M2-01 | model profiles data, loader, overrides, Models screen (catalog + deprecations) |
-| M2-03 | Capability manifests v1 (full) | 2.5 | M1-05..07 ∥ | complete manifests for claude/codex/agy incl. commands discovery, prompt protocol, update sources |
+| M2-03 | Capability manifests v1 (full) | 2.5 | M1-05, M1-06 ∥ | complete manifests for claude/codex (+ agy if enabled) incl. capability records, commands discovery, prompt protocol with answer states, update sources |
 | M2-04 | Assignment engine | 3 | M2-02, M2-03 | scoring, constraints, explainability, alternatives, 100 % branch coverage, golden tests vs default matrix |
 | M2-05 | MCP delegation server | 3 | M2-04, M1-11 | `capabilities/delegate/status/collect/ask_user`, elicitation, tasks extension, per-Lead registration |
 | M2-06 | Quick Delegate v2 | 1.5 | M2-04, M1-12 | auto-assign with preview + reasons + override |
@@ -97,7 +102,7 @@ Parallel lanes after M1: {M2→M3} · {M4} · {M5} can proceed concurrently; M6 
 | M3-02 | Mission lifecycle & Lead session | 3 | M3-01, M2-05 | PlanMission use case, Lead launch, PLAN.md, plan versions, plan cards approve/edit/reject |
 | M3-03 | Task contract & result collection | 2 | M3-02 | TaskSpec→TaskResult, result extraction from worktree (branch, diffstat, tests, summary) |
 | M3-04 | Cross-vendor review rule & rounds | 3 | M3-03 | ReviewRule, reviewer assignment, findings capture, max N rounds, two-reviewer for high risk |
-| M3-05 | Review & Merge UI | 3 | M3-04 | diff per task, inline comments routed to author agent, test status, approve/request changes |
+| M3-05 | Review & Merge UI | 4 | M3-04 | diff per task, inline comments routed to author agent, validation on the recorded commit, approval bound to sha (stale on new commits), PR head + checks recheck at merge |
 | M3-06 | PR integration | 2 | M3-05 | `gh`/GitLab with user credentials, PR body from TaskResult, merge by lead/human per policy |
 | M3-07 | Parallel isolation | 1.5 | M1-03 ∥ | `$ORCH_PORT`, `$ORCH_DB_SUFFIX` injection, port allocator, collision tests |
 | M3-08 | Missions screen | 3 | M3-04 | DAG view, assignments + reasons, rounds, cost, status, cancel/retry |
@@ -175,7 +180,7 @@ Parallel lanes after M1: {M2→M3} · {M4} · {M5} can proceed concurrently; M6 
 | ID | Step | Effort | Depends | Scope |
 |---|---|---|---|---|
 | M10-01 | Repair Agent (ladder 3) | 4 | M6-04, M3-04 | sandboxed agent, inputs (fixture, help, changelog, contract tests), proposes patch, runs suite, PR/apply with approval, guardrails |
-| M10-02 | Community drift loop | 2 | M6-02, M10-03 | opt-in anonymised drift reports → registry staleness → notifications |
+| M10-02 | Community drift loop | 2 | M6-02, M6-03, after M10-03 | opt-in anonymised drift reports → registry staleness → notifications (runs after M10-03: the registry endpoint it consumes) |
 | M10-03 | Plugin/skill/playbook registry | 3 | M6-03, M8-04 | signed manifests, semver, engine compat, trust levels, install from registry/GitHub |
 | M10-04 | Kimi adapter | 2.5 | M2-03 | hooks/ACP/skills, fixtures, contract tests |
 | M10-05 | OpenCode adapter | 2.5 | M2-03 | one adapter for OpenAI-compatible models, fixtures |
@@ -183,5 +188,18 @@ Parallel lanes after M1: {M2→M3} · {M4} · {M5} can proceed concurrently; M6 
 | M10-07 | Governance & releases | 2 | — | ADR-001 license final, name clearance, DCO, RFC process, CoC, semantic-release, Homebrew, npm provenance |
 | M10-08 | 1.0 Definition of Done audit | 1.5 | all | checklist audit, Scorecard ≥ 7, third-party plugin proof, launch |
 
+## Release sequence & gates (revised 2026-09-15 after external review)
+
+| Gate | What must be true | Where |
+|---|---|---|
+| 1. Provider feasibility | Claude Code + Codex approval, cancellation, usage signal, restart/adopt and exit-status behaviour proven on real CLIs; evidence matrix has no `unverified` MVP-required rows | M0-09 |
+| 2. Local MVP | fleet, worktrees, terminal + transcript views, prompts with verified/limited records answered from the web, Quick Delegate | M1-13 (`mvp-1`) |
+| 3. Reliable orchestration | deliverable-specific task results, dependency scheduling, independent-publisher review, validation evidence bound to a commit, controlled merges | M3-09 |
+| 4. Operational maturity | bounded recovery, history + checkpoints, conservative quota handling, desktop with single-owner upgrade protocol, mobile with stale-answer revalidation | M4–M7 |
+| 5. Enterprise (trusted shared-team) | RBAC + OIDC + human-only gates + audit + Postgres/Helm under ADR-019; isolated per-user execution stays post-1.0 | M9 |
+| 6. Ecosystem & 1.0 | kimi + opencode adapters, trusted-tier plugin registry (ADR-014 amended), docs, governance, KPI audit over ≥ 30 days | M10 |
+
+Foundation-level safety that does not wait for M9: local token auth (M0-04), egress allowlist (M0-08), single daemon owner per data directory (M0-04/ADR-020), compliance ESLint rules (M0-08).
+
 ## 1.0 Definition of Done (from source plan §20)
-Five adapters (claude, codex, agy, kimi, opencode; four is the minimum if one is deferred by ADR) pass contract tests on pinned fixtures incl. approval round-trips and quota parsing · worktrees + Review & Merge end-to-end on ≥ 2 providers · cross-vendor review enforced (e2e) · Interaction Bridge from web + PWA on all providers via official channels · Doctor + ladder 1–2 live with SLOs met · Tauri signed/notarized, safe updater, budgets met · restore with no lost prompts · forecasting on all providers · OpenSSF Best Practices passing, Scorecard ≥ 7, provenance + signed artifacts, SECURITY.md · docs with ADRs + Plugin Author Guide · ≥ 1 third-party plugin · EN + AR (RTL) UI · trademark-cleared identity.
+Four adapters (claude, codex, kimi, opencode; agy is a fifth only if the ADR-008 gate is resolved) pass contract tests on pinned fixtures incl. approval round-trips and quota parsing, each with a filled evidence-matrix row set (no `unverified` for its declared features) · worktrees + Review & Merge end-to-end on ≥ 2 providers with validation bound to the merged commit · independent-publisher review enforced (e2e, ADR-022) · Interaction Bridge from web + PWA on every provider for prompt kinds recorded `verified`/`limited`, `manual-only` kinds surfaced honestly · Doctor + ladder 1–2 live with SLOs met for known drift kinds · Tauri signed/notarized, safe updater with the ADR-020 upgrade protocol, budgets met · restore passes the M5-05 guarantee matrix · official quota observations where exposed, estimates/unknown labelled elsewhere · OpenSSF Best Practices passing, Scorecard ≥ 7, provenance + signed artifacts, SECURITY.md · docs with ADRs + Plugin Author Guide · ≥ 1 third-party plugin · EN + AR (RTL) UI · trademark-cleared identity.

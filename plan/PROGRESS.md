@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Last updated | 2026-09-14 |
+| Last updated | 2026-09-15 |
 | Current milestone | M0 — Foundation |
 | Current step | M0-01 |
 | MVP target | M0 + M1 complete, all TCs green |
@@ -15,7 +15,7 @@ Update rule: change **Status**, fill **Started/Done** (ISO dates), put test summ
 
 | Milestone | Steps | ⬜ | 🟨 | 🧪 | ✅ | ⛔ | Status | Target start | Target end | Actual end |
 |---|---|---|---|---|---|---|---|---|---|---|
-| M0 — Foundation | 8 | 8 | 0 | 0 | 0 | 0 | ⬜ | | | |
+| M0 — Foundation | 9 | 9 | 0 | 0 | 0 | 0 | ⬜ | | | |
 | M1 — MVP: Live fleet | 13 | 13 | 0 | 0 | 0 | 0 | ⬜ | | | |
 | M2 — Delegation & intelligence | 9 | 9 | 0 | 0 | 0 | 0 | ⬜ | | | |
 | M3 — Missions, review & merge | 9 | 9 | 0 | 0 | 0 | 0 | ⬜ | | | |
@@ -42,6 +42,7 @@ Folder: `01-m0-foundation/` · [README](01-m0-foundation/README.md)
 | M0-06 | HTTP API + WS gateway v1 | [step-06-http-api-ws-gateway-v1.md](01-m0-foundation/step-06-http-api-ws-gateway-v1.md) | 2 d | ⬜ | | | | |
 | M0-07 | Web shell | [step-07-web-shell.md](01-m0-foundation/step-07-web-shell.md) | 2.5 d | ⬜ | | | | |
 | M0-08 | CI & quality gates | [step-08-ci-and-quality-gates.md](01-m0-foundation/step-08-ci-and-quality-gates.md) | 2 d | ⬜ | | | | |
+| M0-09 | Provider feasibility gates & evidence matrix | [step-09-provider-feasibility-gates-and-evidence-matrix.md](01-m0-foundation/step-09-provider-feasibility-gates-and-evidence-matrix.md) | 3 d | ⬜ | | | | human-run on real CLIs; gate for M1-05/M1-06 |
 
 ### M1 — MVP: Live fleet
 Folder: `02-m1-mvp-live-fleet/` · [README](02-m1-mvp-live-fleet/README.md)
@@ -52,9 +53,9 @@ Folder: `02-m1-mvp-live-fleet/` · [README](02-m1-mvp-live-fleet/README.md)
 | M1-02 | PTY port & SessionSupervisor | [step-02-pty-port-and-sessionsupervisor.md](02-m1-mvp-live-fleet/step-02-pty-port-and-sessionsupervisor.md) | 3 d | ⬜ | | | | |
 | M1-03 | Worktree manager | [step-03-worktree-manager.md](02-m1-mvp-live-fleet/step-03-worktree-manager.md) | 2 d | ⬜ | | | | |
 | M1-04 | BinaryRegistry & provider detection | [step-04-binaryregistry-and-provider-detection.md](02-m1-mvp-live-fleet/step-04-binaryregistry-and-provider-detection.md) | 1.5 d | ⬜ | | | | |
-| M1-05 | Claude Code adapter v1 | [step-05-claude-code-adapter-v1.md](02-m1-mvp-live-fleet/step-05-claude-code-adapter-v1.md) | 4 d | ⬜ | | | | |
-| M1-06 | Codex adapter v1 | [step-06-codex-adapter-v1.md](02-m1-mvp-live-fleet/step-06-codex-adapter-v1.md) | 4 d | ⬜ | | | | |
-| M1-07 | Antigravity adapter v1 (opt-in) | [step-07-antigravity-adapter-v1-opt-in.md](02-m1-mvp-live-fleet/step-07-antigravity-adapter-v1-opt-in.md) | 3 d | ⬜ | | | | |
+| M1-05 | Claude Code adapter v1 | [step-05-claude-code-adapter-v1.md](02-m1-mvp-live-fleet/step-05-claude-code-adapter-v1.md) | 5 d | ⬜ | | | | |
+| M1-06 | Codex adapter v1 | [step-06-codex-adapter-v1.md](02-m1-mvp-live-fleet/step-06-codex-adapter-v1.md) | 5 d | ⬜ | | | | |
+| M1-07 | Antigravity adapter v1 (opt-in) | [step-07-antigravity-adapter-v1-opt-in.md](02-m1-mvp-live-fleet/step-07-antigravity-adapter-v1-opt-in.md) | 3 d | ⬜ | | | | gated: ADR-008 (amended) terms resolution + M0-09 agy row; no downstream dependency |
 | M1-08 | Telemetry plane & fixture recorder | [step-08-telemetry-plane-and-fixture-recorder.md](02-m1-mvp-live-fleet/step-08-telemetry-plane-and-fixture-recorder.md) | 2.5 d | ⬜ | | | | |
 | M1-09 | Terminals grid UI | [step-09-terminals-grid-ui.md](02-m1-mvp-live-fleet/step-09-terminals-grid-ui.md) | 3 d | ⬜ | | | | |
 | M1-10 | Fleet screen v1 + start session | [step-10-fleet-screen-v1-start-session.md](02-m1-mvp-live-fleet/step-10-fleet-screen-v1-start-session.md) | 2 d | ⬜ | | | | |
@@ -86,7 +87,7 @@ Folder: `04-m3-missions-review-merge/` · [README](04-m3-missions-review-merge/R
 | M3-02 | Mission lifecycle & Lead session | [step-02-mission-lifecycle-and-lead-session.md](04-m3-missions-review-merge/step-02-mission-lifecycle-and-lead-session.md) | 3 d | ⬜ | | | | |
 | M3-03 | Task contract & result collection | [step-03-task-contract-and-result-collection.md](04-m3-missions-review-merge/step-03-task-contract-and-result-collection.md) | 2 d | ⬜ | | | | |
 | M3-04 | Cross-vendor review rule & rounds | [step-04-cross-vendor-review-rule-and-rounds.md](04-m3-missions-review-merge/step-04-cross-vendor-review-rule-and-rounds.md) | 3 d | ⬜ | | | | |
-| M3-05 | Review & Merge UI | [step-05-review-and-merge-ui.md](04-m3-missions-review-merge/step-05-review-and-merge-ui.md) | 3 d | ⬜ | | | | |
+| M3-05 | Review & Merge UI | [step-05-review-and-merge-ui.md](04-m3-missions-review-merge/step-05-review-and-merge-ui.md) | 4 d | ⬜ | | | | |
 | M3-06 | PR integration | [step-06-pr-integration.md](04-m3-missions-review-merge/step-06-pr-integration.md) | 2 d | ⬜ | | | | |
 | M3-07 | Parallel isolation | [step-07-parallel-isolation.md](04-m3-missions-review-merge/step-07-parallel-isolation.md) | 1.5 d | ⬜ | | | | |
 | M3-08 | Missions screen | [step-08-missions-screen.md](04-m3-missions-review-merge/step-08-missions-screen.md) | 3 d | ⬜ | | | | |
@@ -208,3 +209,6 @@ Folder: `11-m10-ecosystem-launch/` · [README](11-m10-ecosystem-launch/README.md
 | Date | Step | Change |
 |---|---|---|
 | 2026-09-14 | — | Plan created (11 milestones, 91 steps). |
+| 2026-09-15 | — | External feasibility review (astra) applied — see `REVIEW-RESPONSE-2026-09-15.md`. New step M0-09 (provider feasibility gates & evidence matrix); M1-05/M1-06 now depend on it (+1 d each); M3-05 +1 d (validation bound to commit); M2-03 no longer depends on M1-07. |
+| 2026-09-15 | M1-07 | Gated by ADR-008 (amended): terms resolution + M0-09 agy evidence row required before start; removed from every downstream dependency and acceptance criterion. |
+| 2026-09-15 | — | ADR-008 and ADR-014 amended; ADR-019…022 added; risks R17…R21 added; goals G2/G4 reworded; `00-foundations/14-provider-evidence-matrix.md` added. |

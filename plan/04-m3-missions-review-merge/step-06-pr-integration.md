@@ -136,6 +136,9 @@ Planned by <lead provider/model> · plan v<N> · playbook <id>@<version> · Orch
 Cost estimate: <usd> (estimate)
 ```
 
+### 4.7 Review reconciliation contract (2026-09-15)
+At PR merge time fetch the remote head/base, required check conclusions and current review state. Bind any merge call to expected head SHA through the hosting CLI/API documented precondition. Unsupported atomic preconditions disable automatic remote merge. Local evidence cannot substitute for required remote checks; unknown/pending checks block. A base movement requires integration validation or the hosting merge queue equivalent.
+
 ## 5. Tasks
 - [ ] `ForgeRef` parser (ssh/https, self-hosted hosts from config) + `canOpenPr` / `canMergePr` rules in `packages/core/src/forge/` (100 % branch).
 - [ ] `ForgePort` interface + `GhForgeAdapter` and `GlabForgeAdapter` (documented subcommands only), DI-registered by `kind`.
@@ -183,7 +186,13 @@ Cost estimate: <usd> (estimate)
 | TC-M3-06-09 | No token leakage (compliance) | 1. Run the whole flow with daemon logs at debug 2. `grep -Ei 'token\|authorization\|ghp_\|glpat-' ~/.orchestra/logs/*` | Zero matches; `audit_log` argv rows contain no credential-shaped values; DB has no credential column | ⬜ |
 | TC-M3-06-10 | Forge CLI failure (negative) | 1. Rename the remote to a repo you cannot push to 2. Open PR | `ForgeCommandFailed` with the stderr tail shown verbatim; retry offered; no partial state (no `pr_url` stored) | ⬜ |
 
+### 6.3 Review regression scenarios
+- [ ] Force-push between review and merge: reject stale head.
+- [ ] Required checks missing/pending/failing: no merge.
+- [ ] Remote base changes: revalidate integrated candidate.
+
 ## 7. Acceptance criteria (Definition of Done)
+- [ ] The review reconciliation contract and all §6.3 regression scenarios pass; archive evidence alongside the original test cases.
 - [ ] A mission on a real GitHub repo produces a real PR whose body states author model, reviewer vendor and round count (TC-M3-06-02).
 - [ ] GitLab path proven at least once (TC-M3-06-06).
 - [ ] Orchestra reads, stores and forwards **no** forge credentials; the egress test proves the daemon makes no direct forge API calls (TC-M3-06-09 + extended M0-08 test).

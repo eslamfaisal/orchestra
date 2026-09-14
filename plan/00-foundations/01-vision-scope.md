@@ -17,9 +17,9 @@ Developers pay for several AI coding subscriptions (Claude Code, Codex, Antigrav
 | ID | Goal | Measurable target |
 |---|---|---|
 | G1 | **See, control and talk to every agent** in one place, on any device | live terminal + chat for 100 % of sessions; phone approve/answer |
-| G2 | **Right model for the job, every time** | ≥ 60 % of tasks routed off the top-tier model; ≥ 80 % of each paid window used productively |
+| G2 | **Right model for the job** | two separately defined KPIs, each with its own denominator — **K1 off-top-tier share** ≥ 60 % and **K2 productive window utilisation** ≥ 80 % (definitions below; M10-08 owns the canonical queries) |
 | G3 | **Better output through diversity** | cross-vendor review on 100 % of mission tasks |
-| G4 | **Never blocked** | quota forecasting + pre-emptive reroute; Lead handoff on exhaustion |
+| G4 | **Rarely blocked** | reduce *avoidable* interruptions: quota forecasting + pre-emptive reroute and Lead handoff **while eligible capacity exists**; when none does, pause clearly — named reason, blocking window, reset time, what would unblock it. Measured as avoidable-interruption rate, never as a zero-block guarantee |
 | G5 | **Total recall** | every session, plan, task, diff, review, prompt, decision recorded, searchable, replayable |
 | G6 | **Self-maintaining** | drift detected < 60 s; safe remediation < 10 s; vendor changes surfaced as actionable items |
 | G7 | **Extensible and open** | providers, skills, playbooks, policies, model profiles as versioned artifacts; ≥ 1 third-party plugin without a core PR |
@@ -52,4 +52,29 @@ Developers pay for several AI coding subscriptions (Claude Code, Codex, Antigrav
 - A teammate has their own defaults and permissions; every spend/keys action is audited.
 
 ## Product KPIs (tracked from M4 onward in the Fleet screen)
-- Off-top-tier routing % · window utilisation % · cross-review coverage % · reroute success rate · time-to-detect drift · remediation time · restore-without-lost-prompt rate.
+Each KPI has exactly one definition, one denominator and one documented treatment of missing data. **M10-08 owns the canonical query text**; this file owns the intent. The two G2 KPIs are deliberately *separate measurements* — routing a task off the top tier and using a paid window productively are different quantities and must never be summed or substituted for one another.
+
+| KPI | Numerator | Denominator | Missing data |
+|---|---|---|---|
+| **K1 off-top-tier share** (G2a) | routed tasks whose chosen model is not its provider's top tier | all tasks that reached `assigned` in the period, excluding `sandbox` missions | a task with no `routing_decision` row is excluded from both sides and counted in a separate *unrouted* line |
+| **K2 productive window utilisation** (G2b) | quota consumed by tasks that reached a terminal success state (`done`/`approved`) | quota observed as available in that window, **`official` observations only** | windows whose signal is `estimate` or `unknown` are excluded from the denominator and reported as *uncovered windows %*, never imputed |
+| Cross-review coverage % (G3) | mission tasks with a review round by an independent reviewer identity (ADR-022) | mission tasks whose TaskType requires review | tasks with `degraded_same_vendor` count as uncovered |
+| Avoidable-interruption rate (G4) | pauses where eligible capacity existed at pause time | all pauses | pauses with no capacity snapshot are counted as avoidable (conservative) |
+| Reroute success rate · time-to-detect drift · remediation time (G6) | per `doctor.*` evidence metrics | attempted reroutes / detected drifts | — |
+| Restore outcome mix (G5) | counts per recovery outcome, reported as a mix | restore attempts | never collapsed into a single "zero lost prompts" number |
+
+## Promises we deliberately do not make
+Orchestra orchestrates other vendors' CLIs. Anything it cannot observe or control, it does not promise. These are product requirements, not caveats bolted on later — every acceptance criterion in the plan must be phrased in the right-hand column.
+
+| Ambition we are **not** claiming | What we require instead |
+|---|---|
+| "Every coding CLI works fully" | supported capabilities for explicitly tested CLI versions and execution modes, recorded in the evidence matrix (`14-provider-evidence-matrix.md`) |
+| "Never blocked" | reduce avoidable interruptions; pause clearly and explain when no eligible capacity exists |
+| Exact universal remaining quota | official observations where the vendor exposes them; otherwise a labelled estimate, or `unknown` |
+| Hard spending caps while tasks run | **admission** budgets with a documented in-flight overshoot allowance, unless the provider itself enforces a cap (ADR-021) |
+| "Zero lost prompts in every failure" | durable captured prompts, explicit per-outcome recovery reporting, and declared failure boundaries |
+| Complete historical working-tree replay | recorded commits plus explicitly captured snapshots; uncaptured uncommitted state is labelled as a gap |
+| Automatic repair of any vendor change | bounded recovery for *known* failure shapes, then human escalation |
+| Guaranteed correct model selection | explainable routing evaluated against measured outcomes |
+| Seamless cross-provider continuation | a new execution seeded by an explicit handoff package; hidden provider-side state is not transferable |
+| Absolute secret-free recording | defined capture exclusions, redaction, restricted access, and documented residual limitations |

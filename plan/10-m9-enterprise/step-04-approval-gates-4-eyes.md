@@ -11,7 +11,7 @@
 | Owner | |
 
 ## 1. Goal
-Policy decides when work must stop and wait for a human decision. When a task is `risk: high`, or its `taskType` is in `{infra, migration, release, security}`, or a merge targets a protected branch, the daemon opens an **approval gate**: the task moves to `blocked/awaiting_approval`, an `AgentPrompt` of the new kind `gate` appears at the top of Attention with the reasons that triggered it and a preview of what will happen, and nothing proceeds until an authorised approver decides. With `fourEyes: true` the requester cannot be the approver. Gates time out into a configured outcome (`escalate` by default, never a silent approve), escalate to a named role or user, and every open/approve/reject/expire/escalate is audited into the M9-03 chain. In single-user mode gates are off by default; turning them on in a solo setup still works (you approve your own gate unless `fourEyes` is set, which would deadlock and is therefore refused at config load).
+Policy decides when work must stop and wait for a human decision. When a task is `risk: high`, or its `taskType` is in `{infra, migration, release, security}`, or a merge targets a protected branch, the daemon opens an **approval gate**: the task moves to `blocked/awaiting_approval`, an `AgentPrompt` of the new kind `gate` appears at the top of Attention with the reasons that triggered it and a preview of what will happen, and nothing proceeds until an authorised approver decides. With `fourEyes: true` the requester cannot be the approver. **A gate can only ever be decided by a human**: the deciding principal must be of kind `human` (an interactive browser session or an OIDC login, or a personal API token explicitly issued as `principal_kind: human`). Agent-kind principals — a Lead session's MCP actor, an automation's owner token, any API token flagged `service` — are refused with `reason: human_required` even when the role they carry would otherwise grant `gate.approve`. Role membership is necessary and never sufficient. Gates time out into a configured outcome (`escalate` by default, never a silent approve), escalate to a named role or user, and every open/approve/reject/expire/escalate is audited into the M9-03 chain. In single-user mode gates are off by default; turning them on in a solo setup still works (you approve your own gate unless `fourEyes` is set, which would deadlock and is therefore refused at config load).
 
 ## 2. Why
 - Persona "team lead" needs "policies, budgets, **approval gates**, audit, RBAC" (`00-foundations/01-vision-scope.md`); source plan §17 lists "approval gates (4-eyes option)" as an enterprise pillar.
@@ -26,7 +26,9 @@ Policy decides when work must stop and wait for a human decision. When a task is
 - `Gate` aggregate, state machine, and pure `evaluateGates(context, policy)` rule in `packages/core/src/gates/` (100 % branch).
 - New `AgentPrompt` kind `gate` with `answerTransport: 'internal'` (the daemon is the consumer — no vendor channel involved) and priority above permission prompts.
 - Gate triggers: task `risk`, `taskType` in a configured set, merge to a protected branch, mission budget breach (from M4-04 `onExhausted`), and an explicit `requiresApproval: true` on a playbook step (M3-01).
+- **Human-actor rule** (`HumanRequired`): principal-kind classification (`human | service`) on every authentication strategy, `principal_kind` on personal API tokens, and the server-side refusal of any non-human decider on both decision paths.
 - 4-eyes rule (approver ≠ requester), approver-role rule (`gate.approve` permission from M9-01, Lead cannot approve their own request), optional `minApprovals: 1|2`.
+- The normative mapping from M3-01's playbook `gate` field (`none | lead | human | 4-eyes`) to `GateRule` (§4.1.1), and the removal of M3-01's "`4-eyes` degraded to `human`" load-time warning.
 - Timeout + escalation: `onTimeout: 'escalate' | 'reject'` (never `approve`), escalation to a role or a named user, repeat interval, maximum escalations.
 - `gates` and `gate_decisions` tables; full audit through M9-03.
 - Attention gate card (reasons, preview diff/plan/command, Approve/Reject with mandatory reason on reject), Review and Missions badges, blocked-task banner.
@@ -50,7 +52,35 @@ Policy decides when work must stop and wait for a human decision. When a task is
 - State machine: `open → approved | rejected | expired | cancelled`; `open → escalated → open` (escalation re-arms the deadline and widens the notified audience without resetting decisions already recorded).
 - Pure rules (`packages/core/src/gates/rules.ts`, 100 % branch):
   - `evaluateGates(ctx: GateContext, policy: GatePolicy) → Gate[]` — pure, deterministic, order-stable; returns zero or more gates with their reasons. `ctx` carries `{ taskType, risk, branchTarget?, playbookStep?, budgetState?, missionId?, requesterUserId }`.
-  - `canDecide(gate, actor) → Result<void, GateError>`: requires `gate.approve` scope-checked by M9-01; `fourEyes && actor.userId === gate.requesterUserId ⇒ Err(FourEyesViolation)`; an actor who already decided ⇒ `Err(AlreadyDecided)`; a non-`open` gate ⇒ `Err(GateClosed)`.
+  - `canDecide(gate, actor, principal) → Result<void, GateError>`, checked in this order so the strongest rule cannot be shadowed by a weaker one: **(1)** `principal.kind !== 'human'` ⇒ `Err(HumanRequired)` — evaluated *before* the permission check, so an agent never even reaches "you lack `gate.approve`"; **(2)** `gate.approve` scope-checked by M9-01; **(3)** `fourEyes && actor.userId === gate.requesterUserId ⇒ Err(FourEyesViolation)`; **(4)** an actor who already decided ⇒ `Err(AlreadyDecided)`; **(5)** a non-`open` gate ⇒ `Err(GateClosed)`.
+- **Human-actor rule (normative).** A gate decision is a *human* act. `Principal.kind` is decided by the authentication strategy that produced it, never by the role attached to it:
+
+| Principal source | `kind` | May decide a gate |
+|---|---|---|
+| Browser cookie session (M9-02 OIDC login) | `human` | yes |
+| Interactive local session in local mode (`local-token` at the console) | `human` | yes |
+| Personal API token issued with `principal_kind: human` (an operator's own CLI, the PWA) | `human` | yes |
+| Personal API token issued with `principal_kind: service` (CI, scripts, bots) — the **default** for new tokens | `service` | no — `human_required` |
+| MCP actor inside a Lead session (`Actor.kind: 'agent'`, M9-01 §4.1) | `service` | no — `human_required` |
+| Automation owner context (M9-07, `Actor.kind: 'system'`) | `service` | no — `human_required` |
+| Auto-answer policy engine (`Actor.kind: 'policy'`, M8-08) | `service` | no — `human_required` |
+
+  The rule is deliberately redundant with `Actor.kind`: `Actor.kind` says *on whose behalf*, `Principal.kind` says *who physically acted*. A gate needs both to be a person, so the refusal is `actor.kind !== 'user' || principal.kind !== 'human'`. An agent carrying a Lead's permissions is the exact case 4-eyes exists to stop, and it is refused here rather than being left to the role check. There is no policy switch that turns this off; a deployment that wants unattended approval of a class of work removes the gate rule for that class instead.
+
+#### 4.1.1 Mapping M3-01 playbook gates → `GateRule` (normative; M3-01 is not edited here)
+`03-…/step-01-playbook-schema-and-shipped-playbooks.md` §4 defines `Gate = 'none' | 'lead' | 'human' | '4-eyes'` on a playbook step, applied after review approval and before merge, and currently accepts `4-eyes` "treated as `human` with a load-time warning until M9-04". **This step is that M9-04**; the warning is removed and the mapping below becomes the loader's behaviour. The M3-01 file should gain a one-line cross-reference to this section when it is next touched (flagged, not edited here).
+
+| Playbook `gate` | `GateRule` produced | `kind` | `requiredApprovals` | `fourEyes` | `approverRoles` |
+|---|---|---|---|---|---|
+| `none` (or absent) | none — `evaluateGates` returns no gate from the step flag; other triggers (risk, taskType, protected branch) still apply independently | — | — | — | — |
+| `lead` | one human approval from the mission's leadership | `task_merge` | 1 | `false` | `['lead','admin']` |
+| `human` | one human approval from anyone holding `gate.approve` | `task_merge` | 1 | `false` | policy default (`['lead','admin']` with the built-in matrix) |
+| `4-eyes` | two *distinct* human approvals, requester excluded | `task_merge` | 2 | `true` | policy default |
+
+- Reason code for all three is `playbook_step`, with `detail` = `"<playbookId>#<stepId>: gate=<value>"`, so Attention shows which step asked.
+- `lead` and `human` produce the same eligible set under the built-in role matrix (`gate.approve` is held by Lead and Admin only); they diverge only once custom roles exist (M10 backlog). The loader keeps both values rather than collapsing them, and `ExplainGate` reports which one fired.
+- **`lead` does not mean the Lead *agent* may approve.** All four values require `principal.kind === 'human'`. A playbook cannot grant an LLM the right to sign off on its own fleet's merge.
+- `4-eyes` on a step where `FourEyesUnsatisfiable` holds (fewer than two eligible human approvers) fails **playbook validation at load** with the same error, consistent with the policy-level rule — it does not silently degrade to `human` any more.
   - `applyDecision(gate, decision) → Gate` — one reject closes the gate immediately (`rejected`); approvals accumulate until `requiredApprovals` is reached (`approved`).
   - `onDeadline(gate, policy, now) → 'escalate' | 'reject' | 'noop'` — `escalate` while `escalations < maxEscalations`, then the configured terminal outcome; **never** `approve`.
   - Config validity rule (checked at policy load, not at runtime): `fourEyes: true` with fewer than two users holding `gate.approve` ⇒ `Err(FourEyesUnsatisfiable)`, so a solo install cannot configure itself into a deadlock.
@@ -80,10 +110,16 @@ export interface GateRule {
 
 // packages/core/src/gates/rules.ts (pure)
 export function evaluateGates(ctx: GateContext, policy: GatePolicy): Gate[];
-export function canDecide(gate: Gate, actor: Actor): Result<void, GateError>;
+export function canDecide(gate: Gate, actor: Actor, principal: Principal): Result<void, GateError>;
 export function applyDecision(gate: Gate, d: GateDecision): Gate;
 export function onDeadline(gate: Gate, policy: GatePolicy, now: Iso8601): 'escalate' | 'reject' | 'noop';
+
+// principal kind is set by the auth strategy (M9-01 AuthStrategyRegistry), never by role
+export type PrincipalKind = 'human' | 'service';
+export interface Principal { kind: PrincipalKind; userId: string; via: 'cookie-session'|'local-token'|'api-token'|'mcp'|'automation'|'policy'; tokenId?: string }
+
 export type GateError =
+  | { code: 'HumanRequired'; reason: 'human_required'; actorKind: Actor['kind']; principalKind: PrincipalKind; via: Principal['via'] }
   | { code: 'FourEyesViolation'; requesterUserId: string }
   | { code: 'AlreadyDecided'; userId: string }
   | { code: 'GateClosed'; state: GateState }
@@ -102,7 +138,7 @@ export interface GateRepository {
 
 // apps/daemon/src/application/gates/ — one use case per class
 export class OpenGates      { execute(ctx: GateContext, actor: Actor): Promise<Result<Gate[], GateError>>; }
-export class DecideGate     { execute(i: { gateId: string; decision: 'approve'|'reject'; reason?: string }, actor: Actor): Promise<Result<Gate, GateError>>; }
+export class DecideGate     { execute(i: { gateId: string; decision: 'approve'|'reject'; reason?: string }, actor: Actor, principal: Principal): Promise<Result<Gate, GateError>>; }
 export class EscalateGates  { execute(now: Iso8601): Promise<Result<{ escalated: number; closed: number }, GateError>>; }
 export class CancelGates    { execute(s: GateSubject, reason: string): Promise<Result<number, GateError>>; }
 export class ExplainGate    { execute(id: string): Promise<Result<GateExplanation, GateError>>; }   // rules that fired + policy layer that supplied them
@@ -111,10 +147,11 @@ export class ExplainGate    { execute(id: string): Promise<Result<GateExplanatio
 ### 4.3 Data / schema changes
 Migration `0093_approval_gates` (new tables — **not** in `04-domain-model.md` §4, flag for update):
 - `gates (id text pk, kind text, state text, subject_kind text, subject_id text, mission_id text null, policy_id text, rule_ids_json text, reasons_json text, requester_user_id text, required_approvals integer, four_eyes integer, prompt_id text null, opened_at text, expires_at text null, escalations integer default 0, decided_at text null, outcome text null)`; indices `(state, expires_at)`, `(subject_kind, subject_id)`, `(mission_id)`.
-- `gate_decisions (id text pk, gate_id text, user_id text, decision text, reason text null, ts text, actor_roles_json text, unique(gate_id, user_id))` — the unique constraint is the second line of defence behind `AlreadyDecided`.
+- `gate_decisions (id text pk, gate_id text, user_id text, decision text, reason text null, ts text, actor_roles_json text, principal_kind text not null, principal_via text not null, unique(gate_id, user_id))` — the unique constraint is the second line of defence behind `AlreadyDecided`; `principal_kind` is stored so an auditor can later prove each recorded approval was made by a person, and a `check (principal_kind = 'human')` constraint makes a non-human row unwritable even through a repository bug.
+- `api_tokens`: add `principal_kind text not null default 'service'` (the table is M9-01's; this step adds the column and the issue-time choice — M9-01 flagged for a one-line note). Existing tokens migrate to `service`, so **no token issued before this step can decide a gate** — a deliberate fail-closed default, called out in the release notes.
 - `tasks`: reuse `blocked_reason` (added in M3-02) with value `awaiting_approval`; add `gate_id text null` for the direct link.
 - `agent_prompts`: no schema change — `kind` gains the value `gate`, `answer_transport` gains `internal`, `payload_json` carries `{ gateId, reasons, preview }` (M1-11 kept both columns free-form).
-- New events (extension of `04-domain-model.md` §3, new `gate.*` namespace): `gate.opened`, `gate.approved`, `gate.rejected`, `gate.expired`, `gate.escalated`, `gate.cancelled`, `gate.denied_decision` (a `FourEyesViolation`/`NotAnApprover` attempt).
+- New events (extension of `04-domain-model.md` §3, new `gate.*` namespace): `gate.opened`, `gate.approved`, `gate.rejected`, `gate.expired`, `gate.escalated`, `gate.cancelled`, `gate.denied_decision` (a `HumanRequired`/`FourEyesViolation`/`NotAnApprover` attempt — the payload carries the `GateError.code`, and `human_required` denials are the ones a security reviewer will look for first).
 - Config: `policies.gates` (the `GatePolicy` above, layered per M8-01), `features.gates: boolean` (default `true` when `auth.mode: team`, `false` in local mode).
 
 ### 4.4 Infrastructure (tmux, git, fs, network, external processes)
@@ -129,19 +166,21 @@ Migration `0093_approval_gates` (new tables — **not** in `04-domain-model.md` 
 |---|---|---|
 | `GET /gates?state=open&missionId=` | `audit.read` or `gate.approve` | list with reasons and remaining time |
 | `GET /gates/:id` | as above | gate + decisions + `ExplainGate` output |
-| `POST /gates/:id/decision` `{ decision, reason? }` | `gate.approve` (+ 4-eyes rule) | 200 gate; 403 `FourEyesViolation` / `NotAnApprover`; 409 `GateClosed`; `Idempotency-Key` honoured |
+| `POST /gates/:id/decision` `{ decision, reason? }` | `gate.approve` (+ human-actor rule + 4-eyes rule) | 200 gate; 403 `{ code: 'HumanRequired', reason: 'human_required' }` for any non-human principal (checked first); 403 `FourEyesViolation` / `NotAnApprover`; 409 `GateClosed`; `Idempotency-Key` honoured |
 | `POST /gates/:id/cancel` | `user.manage` | Admin-only abort (audited) |
 
-- The same decision is reachable through `POST /prompts/:id/answer` (M1-11) because the gate is an `AgentPrompt` — both paths funnel into `DecideGate`, so there is exactly one authorisation check.
+- The same decision is reachable through `POST /prompts/:id/answer` (M1-11) because the gate is an `AgentPrompt` — both paths funnel into `DecideGate`, so there is exactly one authorisation check, and the human-actor rule cannot be walked around by answering the prompt instead of the gate. The MCP `ask_user`/answer surface is explicitly *not* a third path: an agent answering a `kind: 'gate'` prompt gets `human_required`.
 - WS: topic `gates` (deltas, filtered by M9-01's `VisibilityFilter`) and the existing `prompts` topic for the card itself.
 - Web:
   - **Attention** — gate card at priority 0 (above destructive permissions): title "Approval required — `<subject>`", a reasons list rendered from `GateReason.code` with human copy, a preview block (task goal + acceptance for `task_start`; diffstat + target branch + review verdicts for `task_merge`; plan summary for `mission_plan`), approver hints ("needs 2 approvals · you are 1 of 3 eligible"), Approve / Reject (reject requires a reason ≥ 10 chars), a "why am I blocked?" link to `ExplainGate`, and a countdown with the timeout outcome spelled out ("escalates to Admins in 3 h 12 m — never auto-approves").
   - When the viewer is the requester and `fourEyes` is on, the buttons are disabled with the tooltip "You requested this — a second approver is required (4-eyes)". The server still rejects a forced call.
+  - The card states who may decide in words: "Only a signed-in person can approve this. API tokens marked *service*, automations and agent sessions are refused." — so the rule is discoverable before someone scripts against it and gets a 403.
+  - **Settings → Users & roles**, "New API token" dialog (M9-01's dialog, extended here): a required choice between *Personal (human)* — "can approve gates on your behalf; only for a CLI or device you use interactively" — and *Service* — "for CI and scripts; cannot approve gates", defaulting to Service. The token list shows the kind as a column; the kind is immutable after issue (re-issue to change it).
   - **Missions** (M3-08) and **Board** (M2-07): a `status-blocked` badge "awaiting approval" on the task with a deep link to the gate.
   - **Review** (M3-05): the merge button is replaced by "Request approval" / "Awaiting approval (1/2)".
   - **Settings → Policies** (M8-02): the `policies.gates` section with a live "what would be gated" preview over the current task taxonomy, and an inline error when `FourEyesUnsatisfiable`.
   - EN + AR strings; status by icon + text, never colour alone (12-ux).
-- CLI: `orch gate list [--open]`, `orch gate show <id>`, `orch gate approve <id> [--reason]`, `orch gate reject <id> --reason <text>`, all `--json`.
+- CLI: `orch gate list [--open]`, `orch gate show <id>`, `orch gate approve <id> [--reason]`, `orch gate reject <id> --reason <text>`, all `--json`. `approve`/`reject` through a `service` token exit non-zero with the message "this token cannot approve gates (human_required) — issue a personal token in Settings → Users & roles"; `orch users token … --kind human|service` (default `service`) mirrors the dialog.
 
 ### 4.6 Flow / sequence
 ```
@@ -154,7 +193,8 @@ DelegateTask / MissionScheduler about to start a task
                             audit(action='gate.open', reasons, ruleIds)
 
 approver clicks Approve (or POST /prompts/:id/answer)
-  → DecideGate → canDecide(gate, actor)
+  → DecideGate → canDecide(gate, actor, principal)
+        Err(HumanRequired)     ⇒ 403 + gate.denied_decision(human_required) + audit(outcome='denied', principalVia)
         Err(FourEyesViolation) ⇒ 403 + gate.denied_decision + audit(outcome='denied')
         Ok ⇒ addDecision (unique(gate_id,user_id)) → applyDecision
              approvals < required ⇒ gate stays open, card shows 1/2
@@ -168,7 +208,10 @@ EscalateGates (every ≤30 s, deadlines persisted)
 ```
 
 ## 5. Tasks
-- [ ] `packages/core/src/gates/`: types, state machine, `evaluateGates`, `canDecide`, `applyDecision`, `onDeadline`, `FourEyesUnsatisfiable` validation; table-driven tests to 100 % branch coverage.
+- [ ] `packages/core/src/gates/`: types, state machine, `evaluateGates`, `canDecide` (human-actor check first), `applyDecision`, `onDeadline`, `FourEyesUnsatisfiable` validation; table-driven tests to 100 % branch coverage.
+- [ ] `Principal` + `PrincipalKind` in `packages/core`: every M9-01 `AuthStrategy` and every internal actor factory (MCP, automation, policy) stamps a kind; an architecture test fails if any strategy omits it or defaults it to `human`.
+- [ ] `api_tokens.principal_kind` column + issue-time choice (API, UI dialog, `orch users token --kind`), defaulting to `service`; existing tokens migrated to `service`.
+- [ ] Playbook gate mapping (§4.1.1) in the M3-01 loader: `none|lead|human|4-eyes` → `GateRule`, `playbook_step` reason detail, removal of the "`4-eyes` degraded to `human`" warning, and `FourEyesUnsatisfiable` raised at playbook validation. Re-run CT-M3-01-01 (its "warnings only for `4-eyes`" expectation becomes "zero warnings").
 - [ ] `packages/catalog/schemas/gate-policy.schema.ts` (Zod) + default policy shipped in `examples/policies/gates.yaml`; loader hooked into the M8-01 precedence chain.
 - [ ] Migration `0093_approval_gates` (`gates`, `gate_decisions`, `tasks.gate_id`, indices); Kysely + in-memory repositories + shared contract spec.
 - [ ] Use cases `OpenGates`, `DecideGate`, `EscalateGates`, `CancelGates`, `ExplainGate`.

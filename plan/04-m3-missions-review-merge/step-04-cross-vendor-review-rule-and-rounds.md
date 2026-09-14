@@ -47,7 +47,7 @@ After this step **no mission task reaches merge without being reviewed by a diff
 - `ReviewVerdict = 'approved' | 'approved_with_nits' | 'changes_requested' | 'rejected' | 'inconclusive'`.
 - `ReviewRule` (pure, `packages/core/src/review/review-rule.ts`):
   - `requiredReviews(task, taxonomy, playbookStep) → { count: 0|1|2, reason }` — `0` when `reviewRequired: false` **and** `reviewRounds: 0`; `2` when taxonomy says `two-reviewer` or `risk: high`.
-  - `eligibleReviewers(authorDecision, candidates, policy) → Result<Candidate[], ReviewError>` — filters `provider !== author.provider`; if empty and `policy.allowSameVendorDegrade`, returns same-provider candidates with `model !== author.model` flagged `degraded: true`; if still empty ⇒ `Err(NoEligibleReviewer)`.
+  - `eligibleReviewers(authorDecision, candidates, policy) → Result<Candidate[], ReviewError>` — filters known `modelPublisher !== author.modelPublisher` (ADR-022); if empty and `policy.allowSameVendorDegrade`, returns explicitly degraded candidates with a different model family flagged `degraded: true`; if still empty ⇒ `Err(NoEligibleReviewer)`.
   - `mergeVerdicts(reviews) → ReviewVerdict` — strictest wins: any `rejected` ⇒ `rejected`; any `changes_requested` ⇒ `changes_requested`; any `inconclusive` with the other approved ⇒ `changes_requested`; all approved (nits allowed) ⇒ `approved_with_nits` when any nit exists, else `approved`.
   - `nextRound(review, maxRounds) → 'rerun_author' | 'escalate_human' | 'done'`.
   - 100 % branch coverage on all four (M2-04 precedent).
@@ -140,6 +140,9 @@ changes_requested | rejected ─▶ nextRound(round, maxRounds)
 inconclusive / FindingsUnparsable ─▶ one retry of the same round with review-md fallback ─▶ still bad ⇒ escalate_human
 ```
 
+### 4.7 Review reconciliation contract (2026-09-15)
+Record separate integrationId, modelPublisher, modelFamily, endpoint and billingIdentity on author/reviewer decisions. Publisher independence is the default policy; unknown publisher is ineligible for claiming independence. Review records bind headSha, baseSha, task attempt and specHash; source changes invalidate findings disposition and approval. A policy-authorized degraded review is visible and cannot satisfy a gate that requires independence.
+
 ## 5. Tasks
 - [ ] `Review`, `ReviewFinding`, `ReviewVerdict` entities + round state machine in `packages/core/src/review/`.
 - [ ] `ReviewRule` (`requiredReviews`, `eligibleReviewers`, `mergeVerdicts`, `nextRound`) with 100 % branch tests.
@@ -189,7 +192,13 @@ inconclusive / FindingsUnparsable ─▶ one retry of the same round with review
 | TC-M3-04-08 | Malformed reviewer output (negative) | 1. Ask a reviewer in Chat to answer in prose only, then re-run the round | First extraction fails, `REVIEW.md` fallback is attempted, and if still unparsable the round escalates with `FindingsUnparsable`; the raw output is kept as an artifact | ⬜ |
 | TC-M3-04-09 | Restart during a review (resilience) | 1. Start a review round 2. `kill -9` the daemon 3. Restart | Exactly one review row for `(task, round, mode)`; the round either resumes or restarts cleanly; the orphan checkout is swept at boot | ⬜ |
 
+### 6.3 Review regression scenarios
+- [ ] Claude via two adapters is not independent.
+- [ ] Different known publishers via one OpenCode adapter may qualify.
+- [ ] Unknown publisher fails independence; source changes invalidate review.
+
 ## 7. Acceptance criteria (Definition of Done)
+- [ ] The review reconciliation contract and all §6.3 regression scenarios pass; archive evidence alongside the original test cases.
 - [ ] `ReviewRule` has 100 % branch coverage; cross-vendor constraint proven on real CLIs (TC-M3-04-01).
 - [ ] 100 % of mission tasks with `reviewRequired` get at least one review before they can reach `approved` (audit query: zero `task.state=approved` without a `reviews` row).
 - [ ] Same-vendor review is impossible unless `review.allowSameVendorDegrade` is explicitly set, and every degraded review writes `review.degraded` to the audit log (TC-M3-04-05, TC-M3-04-06).

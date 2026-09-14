@@ -38,7 +38,7 @@ Each milestone folder has a `README.md` (goal, exit criteria, step list, demo sc
 
 ## The MVP
 
-**MVP = M0 + M1.** Exit: two real vendor CLIs (Claude Code + one of Codex/Antigravity) running live in tmux panes inside per-task git worktrees, visible and controllable from the browser, with every agent prompt (permission / question / plan) surfaced in an Attention queue and answerable from the web, plus "Quick Delegate" of a single task to a manually chosen provider. Everything after M1 is layered on top without rewriting the substrate.
+**MVP = M0 + M1.** Exit: Claude Code and Codex (Antigravity only if the ADR-008 gate is resolved) running live in tmux panes inside per-task git worktrees, visible and controllable from the browser, with every agent prompt (permission / question / plan) surfaced in an Attention queue and answerable from the web, plus "Quick Delegate" of a single task to a manually chosen provider. Everything after M1 is layered on top without rewriting the substrate.
 
 ## Workflow loop (per step)
 

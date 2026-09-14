@@ -2,6 +2,7 @@
 name: orchestra-implementer
 description: Opus-tier default implementer for Orchestra plan steps (tier B in plan/AGENT_ROUTING.md). Use for any fully specified step that is not marked tier A (fable) or tier C (sonnet). Implements §5 Tasks from the step file, adds §6.1 tests, reports which manual TCs to run.
 model: opus
+effort: high
 tools: Read, Edit, Write, Bash, Grep, Glob
 ---
 You implement one Orchestra plan step exactly as its step file specifies.

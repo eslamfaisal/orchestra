@@ -52,7 +52,7 @@
   - `orphan_pane` (a pane with an `ORCH_SESSION_ID` unknown to this DB) is **never** killed; it is reported as an Attention item.
   - An `AgentPrompt` in `open` stays `open` with the same id — restore never mints a new prompt id for the same `(sessionId, externalPromptId)`.
   - A prompt in `answered` but not `delivered` is re-delivered **only** when its `AnswerTransport` is ack-based and idempotent; `send-keys-acked` is never auto-replayed (keystrokes cannot be made idempotent) — it is surfaced to the user as "re-send answer?".
-  - `promptsLost` = prompts that were `open` before shutdown and after restore are in none of `{open, answered, delivered, acknowledged, cancelled(session_gone), expired}` — by construction this must be `0`.
+  - `persistedUnaccounted` counts captured prompts without a durable recovery outcome; target 0 in the declared storage fault model. Separately count `answerableRecovered`, `expired`, `cancelled`, `deliveryUncertain` and known capture gaps. Expired or cancelled records never count as answerable recovery; capture during unobserved downtime is unknown, not zero loss.
 
 ### 4.2 Interfaces / contracts
 ```ts
@@ -92,11 +92,11 @@ export interface ReattachSupport {
 }
 export type ReattachOutcome = { status: 'attached' } | { status: 'unavailable'; resumable: boolean; hint: string };
 ```
-`ReattachSupport` is optional on `ProviderAdapter`; an adapter that omits it is treated as `pty-pane` with a no-op reattach (the PTY keeps running in tmux and the daemon needs nothing but the hooks receiver to come back on the same port).
+`ReattachSupport` is optional on `ProviderAdapter`; an adapter that omits it is treated as reattach unavailable; a surviving pane alone does not prove that the provider request channel survived.
 
 ### 4.3 Data / schema changes
 Migration `0054_restore` (extends `04-domain-model.md` §4):
-- `telemetry_inbox(id text pk, received_at text not null, provider_id text not null, channel text not null, session_id_hint text null, external_id text null, headers_json text null, body text not null, state text not null default 'pending', attempts integer not null default 0, error text null, parsed_at text null)`; unique `(channel, external_id)` where `external_id` is not null (idempotency, matching the ingestion rule in `04-domain-model.md` §3); index `(state, received_at)`.
+- `telemetry_inbox(id text pk, received_at text not null, provider_id text not null, channel text not null, session_id_hint text null, external_id text null, headers_json text null, source_generation text not null, body text not null, state text not null default 'pending', attempts integer not null default 0, error text null, parsed_at text null)`; unique `(provider_id, session_id_hint, source_generation, channel, external_id)` where `external_id` is not null (idempotency, matching the ingestion rule in `04-domain-model.md` §3); index `(state, received_at)`.
 - `sessions` add `external_session_id text null` (the vendor's own session/thread id, captured at `SessionStart`), `reattach_kind text not null default 'pty-pane'`, `restored_at text null`, `restore_run_id text null`.
 - `agent_prompts` add `external_prompt_id text null`, `recovered_count integer not null default 0`, `last_delivery_at text null`; unique `(session_id, external_prompt_id)` where not null.
 - `restore_runs(id text pk, started_at, finished_at, sessions_seen, matched, crashed, orphans, inbox_replayed, prompts_open_before, prompts_recovered, prompts_lost, duration_ms, report_json)`.
@@ -145,6 +145,18 @@ BOOT
   6 restore.completed{restore_lost_prompts} ──▶ metrics ──▶ open HTTP/WS
 UI RECONNECT        subscribe{sinceEventId} ──▶ snapshot(asOfEventId) ──▶ delta… ──▶ Attention shows the SAME prompt id
 ```
+
+### 4.7 Review reconciliation contract (2026-09-15)
+| Boundary | Guarantee and failure outcome |
+|---|---|
+| Persisted captured event | Commit to the inbox before acknowledging receipt; replay idempotently within the tested storage durability model. Disk/volume loss needs backup recovery. |
+| Daemon unavailable | Capture only if a surviving gateway/log source has a durable replayable spool. Direct hooks with no retained source have a capture gap. |
+| Agent survives | Reconnect only with a version/mode-verified transport and matching generation; otherwise transport_lost. |
+| Agent terminates | Keep history; cancel/expire old approvals; resume is a new execution and cannot resurrect old provider requests. |
+| Answer sent, acknowledgement lost | delivery_uncertain; no automatic replay without provider idempotency and correlation. |
+| External side effect | No exactly-once claim. Resolve uncertain execution before restarting or rerouting. |
+
+A surviving session gateway is required only for modes advertised as capturing through daemon downtime: it owns a per-session bounded durable inbox/outbox, source sequence, stable endpoint discovery and exclusive connection ownership. Full spool/disk failure is visible and fails closed for approvals. Redact before persistence, restrict spool access and report capture gaps. Add source generation to prompt and event uniqueness; records without a proven identity are quarantined, never globally deduplicated by external ID. Separate the canonical M1-11 delivery state from a recovery outcome.
 
 ## 5. Tasks
 - [ ] M1-02 change: inject `ORCH_SESSION_ID`/`ORCH_HOST_ID` into `LaunchPlan.env`; set `@orch_session_id`, pane title and tmux environment after `new-window`; store `external_session_id` when the adapter reports it.
@@ -196,7 +208,15 @@ UI RECONNECT        subscribe{sinceEventId} ──▶ snapshot(asOfEventId) ─�
 | TC-M5-05-11 | Recording continuity across restart | 1. Do TC-01 while recording is enabled. 2. After restart, open Timeline (M5-04). | The `.cast` has no gap across the outage (M5-01 TC-05 behaviour), `daemon.restarted` shows as a marker on the event lane, and `VerifyRecordingPipes` logged the pipe as active | ⬜ |
 | TC-M5-05-12 | Restore with 20 live sessions (load) | 1. Start 20 FakeProvider sessions plus the 2 real ones. 2. `kill -9`; restart; time it. | Reconcile completes ≤ 5 s; `/health` reports `restoring` then `ok`; memory stays within the 300 MB idle budget; `restore_lost_prompts=0` | ⬜ |
 
+### 6.3 Review regression scenarios
+- [ ] Crash before capture vs after durable capture: report different outcomes.
+- [ ] Expire/cancel a captured prompt: durable accounting passes but answerable recovery decreases.
+- [ ] Same external ID in two provider sessions stays distinct.
+- [ ] Gateway/spool unavailable or full: report gap; no invented replay.
+- [ ] Crash after external action before ack: no duplicate send or automatic restart.
+
 ## 7. Acceptance criteria (Definition of Done)
+- [ ] The review reconciliation contract and all §6.3 regression scenarios pass; archive evidence alongside the original test cases.
 - [ ] All TC-M5-05-01 … 12 pass, with TC-01/TC-02 executed on a real Claude Code session (the 1.0 DoD item).
 - [ ] `restore_lost_prompts == 0` across ≥ 5 consecutive `kill -9` runs on real CLIs and across the automated soak (IT-06).
 - [ ] Every raw telemetry payload is persisted to `telemetry_inbox` before any parsing, and replay is exactly-once by `(channel, external_id)` (IT-02, TC-03).
