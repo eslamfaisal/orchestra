@@ -165,6 +165,9 @@ orch skill eval clean-arch-flutter-feature --providers claude,codex
 cooling detected mid-run ─▶ remaining items for that provider ─▶ verdict 'skipped' (no outcomes rows, no retry)
 ```
 
+### 4.7 Review reconciliation contract (2026-09-15)
+Resolve evaluation fixtures through the separate trusted EvaluationEnvironment contract in M8-04. Require explicit trust, pinned revision/hash, scratch worktree, scoped credentials and execution/network limits before setup or tests. Skill install alone does not authorize arbitrary eval commands. Keep eval source separate from observational task outcomes and report sample size and variance.
+
 ## 5. Tasks
 - [ ] Make `SkillEvalSpec` executable: fixture path resolution, `inputs` binding to the skill's declared inputs, defaults for `timeoutMs` / `maxCostTier`; validation errors surfaced in M8-04's skill detail.
 - [ ] `EvalScorer` (pure) — quality formula, verdict thresholds, `skipped` short-circuit, reason strings; 100 % branch coverage.
@@ -214,7 +217,13 @@ cooling detected mid-run ─▶ remaining items for that provider ─▶ verdict
 | TC-M8-05-08 | Cancel / resilience | 1. Start a two-provider eval 2. Cancel from the UI mid-run 3. `kill -9` the daemon during a second run, then restart | Cancel stops sessions and cleans worktrees within a few seconds; after the restart the interrupted run is marked `failed` with its partial results intact, no orphan tmux panes, no phantom `skill_installs` rows | ⬜ |
 | TC-M8-05-09 | CI parity | 1. Run the `skill-evals` CI job locally with `--providers fake` | All shipped packs produce deterministic verdicts; job is green; no vendor binary is launched and no credential is read (C9) | ⬜ |
 
+### 6.3 Review regression scenarios
+- [ ] Untrusted eval environment cannot execute.
+- [ ] Pinned environment runs in scratch checkout and leaves user repo unchanged.
+- [ ] Eval and production outcomes remain separately attributable.
+
 ## 7. Acceptance criteria (Definition of Done)
+- [ ] The review reconciliation contract and all §6.3 regression scenarios pass; archive evidence alongside the original test cases.
 - [ ] `orch skill eval` plans, previews estimated cost per item, and spends nothing before an explicit confirmation (C10, TC-M8-05-01).
 - [ ] A real multi-provider run writes ≥ 2 × (number of evals) `outcomes` rows with `skill_id`, `eval_run_id`, `provider_id` and `source='eval'` (milestone exit criterion 2, TC-M8-05-02).
 - [ ] Quality is scored with a cross-vendor review round, not by the author model (TC-M8-05-03).

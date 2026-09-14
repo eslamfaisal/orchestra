@@ -11,7 +11,7 @@
 | Owner | |
 
 ## 1. Goal
-After this step the three remaining "how does my fleet behave" surfaces are editable data. **Instruction fragments** — ordered, scoped snippets — compose into each provider's native instruction file (`CLAUDE.md`, `AGENTS.md`, whatever `manifest.paths.instructionFile` names) and are written into every task worktree at creation inside a marked managed block that never reaches a `TaskResult` diff. **Auto-answer rules** extend M1-11's conservative v1 into an editable, ordered rule list (auto-approve read-only tools and tests, auto-deny destructive commands, escalate infra to admin and `merge:main` to the lead, timeout → notify → pause) where every automatic decision is audited with the rule id and can be overridden while the prompt is still open. **Notification channels** (desktop, Web Push, HMAC-signed webhook) and **update channels** (stable/beta per artifact) get editors with a test-send and a preview.
+After this step the three remaining "how does my fleet behave" surfaces are editable data. **Instruction fragments** — ordered, scoped snippets — prefer a documented session-local channel; only when necessary compose into the provider's native instruction file (`CLAUDE.md`, `AGENTS.md`, whatever `manifest.paths.instructionFile` names) and are written into every task worktree at creation inside a marked managed block that is inspected before any result is eligible for review/merge. **Auto-answer rules** extend M1-11's conservative v1 into an editable, ordered rule list (auto-approve read-only tools and tests, auto-deny destructive commands, escalate infra to admin and `merge:main` to the lead, timeout → notify → pause) where every automatic decision is audited with the rule id and can be overridden while the prompt is still open. **Notification channels** (desktop, Web Push, HMAC-signed webhook) and **update channels** (stable/beta per artifact) get editors with a test-send and a preview.
 
 ## 2. Why
 - **D7 / source plan §16** — instruction fragments, auto-answer rules, notification channels and update channels are the last four items on the settings-and-customization list. After this step nothing in the §16 list is code.
@@ -19,13 +19,13 @@ After this step the three remaining "how does my fleet behave" surfaces are edit
 - **C10** — an auto-approved permission is a spend-and-act decision made without a human. Every one of them gets a `prompt.auto_answered` event **and** an `audit.*` row naming the rule (milestone exit criterion 9).
 - **G3 / C1** — instruction fragments are the documented fallback for providers with no skills directory (M8-04 `excluded:no-skills-location`): the same guidance, delivered through the vendor's own documented instruction file.
 - **C2** — a webhook is the only outbound channel Orchestra gains here. It goes through the allowlisted egress module, is HMAC-signed, and is user-configured; nothing is sent to a vendor endpoint.
-- **C13 / G5** — composed instruction files must not leak secrets into a repo or into a commit; the managed block is reverted before result collection and excluded from git.
+- **C13 / G5** — composed instruction files must not leak secrets into a repo or into a commit; managed blocks are removed without discarding concurrent edits; candidate commits are inspected before review/merge.
 
 ## 3. Scope
 ### In scope
 - `instructions` settings section: ordered fragments with `id`, `title`, `body`, `appliesTo {providers[], taskTypes[], platforms[], roles[]}`, `order`, `enabled`; scopes org → workspace → user → task.
 - Pure `InstructionComposer`: fragment selection, ordering, deduplication, size budget, managed-block rendering with a content hash.
-- `InstructionWriter` per provider driven by `manifest.paths.instructionFile`; written at worktree creation (hooks the M1-03 `CreateWorktree` path, next to M8-04's skill install), reverted before M3-03 result collection, excluded via `.git/info/exclude`.
+- `InstructionWriter` per provider driven by `manifest.paths.instructionFile`; written at worktree creation (hooks the M1-03 `CreateWorktree` path, next to M8-04's skill install), removed with conflict detection before M3-03 result collection; Git exclusions are convenience only.
 - `autoAnswer` settings section: ordered rules with a matcher and an action, replacing M1-11's three config booleans while preserving their behaviour as the shipped default rule set.
 - `AutoAnswerEngine` (pure): prompt + rules → decision (`approve | deny | escalate | ask` ) + matched rule id + reason; deterministic, first-match-wins, with an explicit default rule.
 - Timeout policy per rule: `notify` then `pause` (session paused rather than a guessed answer), extending M1-11's `ExpirePrompts`.
@@ -57,7 +57,7 @@ Three pure services in `packages/core`: `InstructionComposer` (`src/instructions
   ```
   Anything outside the markers is the user's own file and is preserved byte-for-byte. A pre-existing block with a different hash is replaced; a *modified* block (hash mismatch against its own content) is replaced and the modification is reported in Health (someone or something edited it).
 - Secret-shaped literals in a fragment ⇒ `E_SECRET_IN_FRAGMENT` at load time (C13).
-- Revert rule: before result collection (M3-03), the managed block is removed and the file restored to its pre-composition bytes; if the file did not exist before, it is deleted. Asserted by IT-M8-08-03.
+- Removal rule: use the recorded original/composed/current versions to remove only the exact managed block, preserving all legitimate changes outside it. Modified markers, edited managed content or overlapping changes produce a conflict and block submission; never restore the full backup over current edits. Delete a newly created file only if it contains nothing except unchanged managed content.
 
 **AutoAnswerEngine rules**
 - Input: `AgentPrompt` (kind, risk, payload: tool, command, files, plan) + the resolved rule list + context (task type, provider, worktree path).
@@ -163,16 +163,16 @@ updates: { app: stable, providerPlugins: stable, manifests: stable, catalog: bet
 
 ### 4.3 Data / schema changes
 - No new tables for instructions or auto-answer: fragments and rules live in settings layers (M8-01), decisions live in `events` and `audit_log`.
-- Migration `m8_08_worktree_instructions`: `worktrees.instructions_json TEXT NULL` — `{provider, file, hash, usedFragmentIds, droppedFragmentIds, preexisting: boolean, backupRef}` so the revert is exact and auditable.
+- Migration `m8_08_worktree_instructions`: `worktrees.instructions_json TEXT NULL` — `{provider, file, hash, usedFragmentIds, droppedFragmentIds, preexisting: boolean, backupRef}` along with original/composed hashes and cleanup outcome so removal is auditable.
 - Migration `m8_08_prompt_rule`: `agent_prompts.auto_rule_id TEXT NULL`, `agent_prompts.auto_decision TEXT NULL`, `agent_prompts.escalated_to TEXT NULL`, `agent_prompts.paused_at TEXT NULL`.
 - New table `notification_deliveries`: `id, channel, event_type, correlation_json, deep_link, coalesced_count, status ('sent'|'failed'|'suppressed'), error, created_at` — needed so a webhook failure is visible instead of silent.
 - Events: `instructions.composed {taskId, provider, file, hash, used[], dropped[]}`, `instructions.reverted {taskId, file}`, `notification.sent|failed|suppressed {channel, eventType, reason?}`, plus `prompt.auto_answered` (already in `04 §3`) extended with `{ruleId, action, downgradedFrom?}`.
 - `audit_log` rows for every auto-answer decision (`action: 'prompt.auto_answered'`, `actor: {kind:'policy', id: ruleId}`), for webhook config changes, and for update-channel changes (switching to `beta` changes what code runs).
 
 ### 4.4 Infrastructure (tmux, git, fs, network, external processes)
-- `InstructionWriter` (`apps/daemon/src/infrastructure/instructions/`): resolves `manifest.paths.instructionFile` for the session's provider *(verify each provider's documented instruction filename at step start — `CLAUDE.md` and `AGENTS.md` are the known shapes)*; reads any pre-existing file into a backup under `~/.orchestra/instruction-backups/<taskId>/`; writes the composed block (append if the file exists, create otherwise); adds the filename to the worktree's `.git/info/exclude` (M1-03 already owns that file) so it can never enter a diff or a commit.
+- `InstructionWriter` (`apps/daemon/src/infrastructure/instructions/`): resolves `manifest.paths.instructionFile` for the session's provider *(verify each provider's documented instruction filename at step start — `CLAUDE.md` and `AGENTS.md` are the known shapes)*; reads any pre-existing file into a backup under `~/.orchestra/instruction-backups/<taskId>/`; writes the composed block (append if the file exists, create otherwise); adds the filename to the worktree's `.git/info/exclude` (M1-03 already owns that file) as convenience for untracked files only; tracked files and forced adds remain possible.
 - Ordering at session start: `CreateWorktree` → skills install (M8-04) → instructions compose/write → `Launcher.preLaunchFiles()` → `SessionSupervisor.start()`. Instructions are written **before** launch because the CLI reads them at start.
-- Revert: `CollectTaskResult` (M3-03) calls `RevertInstructions` *before* computing the diff; a failure to revert marks the task result with a warning rather than silently shipping the block.
+- Revert: `CollectTaskResult` (M3-03) calls `RevertInstructions` *before* computing the diff; a cleanup conflict or managed content anywhere in candidate commits blocks result submission and merge.
 - Auto-answer integration: `OpenPrompt` (M1-11) calls `AutoAnswerEngine.decide()`; `approve`/`deny` route straight into the existing `AnswerPrompt` use case with `actor: {kind:'policy', id: ruleId}`; `escalate` sets priority and tag and leaves it open; timeouts extend M1-11's persisted deadline scheduler, and `notify-then-pause` stops the pane through `SessionSupervisor` (a documented pause, not a killed session) and emits a notification.
 - Webhook delivery: through the **allowlisted egress module only** (C2), POST JSON with headers `X-Orchestra-Event`, `X-Orchestra-Delivery`, `X-Orchestra-Signature: sha256=<hmac>` over the raw body. The secret is read from env/keychain by `secretRef`; the settings file holds the *name*, never the value (C13, engineering standards). Timeout 5 s, 2 retries with backoff, failures recorded in `notification_deliveries` and surfaced in Health. No redirects followed; URL must be `https:` (or `http://127.0.0.1` for local testing).
 - Update channels: `updates.*` is read by M6-03 (manifest registry), M6-05 (release watchers) and M7-02 (app updater). This step writes and validates the setting and warns on `beta` with the consequence spelled out; it changes no update mechanism.
@@ -218,14 +218,17 @@ domain event ─▶ NotificationRouter.route(ev, cfg, now)
    ─▶ desktop (M7-01) | push (M7-03) | webhook (egress module, HMAC-signed, 2 retries)
    ─▶ notification_deliveries row ─▶ notification.sent|failed|suppressed ─▶ Health
 
-task finishes ─▶ RevertInstructions (before M3-03 diff) ─▶ restore backup / delete created file
+task finishes ─▶ RevertInstructions (before M3-03 diff) ─▶ remove exact managed block / preserve user edits / block conflicts
    ─▶ instructions.reverted ─▶ CollectTaskResult ─▶ diff contains no instruction block
 ```
+
+### 4.7 Review reconciliation contract (2026-09-15)
+Store original/composed/current hashes and a content-addressed managed block identity. Prefer provider-supported instructions outside Git; if unavailable, show the fallback and inspect the full candidate commit range (including earlier commits where a block was later removed). A policy-size overflow rejects composition when a required instruction would be dropped. Organization safety policy is enforced by the deterministic engine, never merely injected into text. Auto-answer cannot satisfy human-only gates.
 
 ## 5. Tasks
 - [ ] `InstructionFragment` VO + `InstructionComposer` (selection, ordering, size budget with named drops, managed-block render + hash); 100 % branch coverage.
 - [ ] Register `instructions`, `autoAnswer`, `notifications`, `updates` settings sections against M8-01 (schemas, task-overridability for `instructions` and `autoAnswer`, JSON Schema export for the editors).
-- [ ] `InstructionWriter` + `RevertInstructions` use cases: manifest path resolution, backup, append/create, `.git/info/exclude`, exact revert, warning on revert failure; migration `m8_08_worktree_instructions`.
+- [ ] `InstructionWriter` + `RevertInstructions` use cases: manifest path resolution, backup, append/create, `.git/info/exclude`, three-way removal, blocking on cleanup conflict; migration `m8_08_worktree_instructions`.
 - [ ] Hook compose/write into the M1-03 → session-start path after skills install and before `preLaunchFiles`; hook revert into M3-03 before diff computation.
 - [ ] `AutoAnswerEngine` (pure, first-match-wins, default `ask`) + `validate()` (unsafe auto-approve, bad/catastrophic regex, duplicate ids); high-risk floor enforced in core with `downgradedFrom` reporting.
 - [ ] Replace M1-11's config booleans with a shipped default rule set that reproduces v1 behaviour exactly; regression test against M1-11's AT-M1-11-05.
@@ -253,8 +256,8 @@ task finishes ─▶ RevertInstructions (before M3-03 diff) ─▶ restore backu
 | AT-M8-08-02 | application | escalate rule on an infra prompt | prompt stays open with raised priority and `escalated_to='admin'`; a notification is routed; no answer delivered |
 | AT-M8-08-03 | application | `notify-then-pause` timeout | notification sent, pane paused via the supervisor, prompt still open and answerable; resuming works |
 | IT-M8-08-01 | integration | task start with two matching fragments | `CLAUDE.md` (per manifest) exists in the worktree with the managed block; `.git/info/exclude` contains it; `worktrees.instructions_json` records the hash |
-| IT-M8-08-02 | integration | pre-existing `AGENTS.md` with user content | user bytes preserved; block appended; after revert the file is byte-identical to the original |
-| IT-M8-08-03 | integration | full task → result collection | the `TaskResult` diff contains no instruction file or block; `instructions.reverted` emitted before the diff was computed |
+| IT-M8-08-02 | integration | pre-existing `AGENTS.md` with user content | user bytes preserved; block appended; after cleanup all legitimate edits remain and only unchanged managed content is removed |
+| IT-M8-08-03 | integration | full task → result collection | the submitted commit range contains no managed block; legitimate instruction-file edits remain; `instructions.reverted` emitted before the diff was computed |
 | IT-M8-08-04 | integration | webhook test send | HTTPS POST through the egress module with a valid HMAC signature; the secret value never appears in logs, events or the settings file; failure recorded with the HTTP status |
 | IT-M8-08-05 | integration | M1-11 parity | with the shipped default rules, M1-11's auto-answer tests (read-only approve, destructive left/denied) still pass unchanged |
 | E2E-M8-08-01 | e2e | auto-answer simulator over recorded fixtures | each fixture shows the matched rule, decision and reason; reordering rules changes the outcome as first-match-wins predicts |
@@ -264,7 +267,7 @@ task finishes ─▶ RevertInstructions (before M3-03 diff) ─▶ restore backu
 | ID | Scenario | Steps | Expected result | Status |
 |---|---|---|---|---|
 | TC-M8-08-01 | Fragment reaches the agent | 1. Settings › Instructions, add a workspace fragment "Always run `flutter analyze` before finishing" with `appliesTo.platforms: [flutter]` 2. Start a task on the Flutter scratch repo 3. `cat .orchestra/worktrees/<task>/CLAUDE.md` | The managed block is present with the fragment between the markers and a hash in the begin marker; the preview in the editor matched the file byte-for-byte | ⬜ |
-| TC-M8-08-02 | No leakage into results | 1. Finish that task 2. Open Review → the task diff 3. `git log -p` on the branch | The diff and the commits contain no `CLAUDE.md` and no managed block; `instructions.reverted` appears in History before the result | ⬜ |
+| TC-M8-08-02 | No leakage into results | 1. Finish that task 2. Open Review → the task diff 3. `git log -p` on the branch | The diff and every submitted commit contain no managed block; legitimate CLAUDE.md changes remain; `instructions.reverted` appears in History before the result | ⬜ |
 | TC-M8-08-03 | Mixed auto-answer run (exit criterion 9) | 1. Run the `FakeProvider` scenario `prompts-mixed` 2. Watch Attention 3. Open History | Read-only permission auto-approved (no card); `rm -rf` auto-denied with the reason reaching the agent; infra command escalated to Attention with admin priority; three `prompt.auto_answered` / `audit` rows each naming the rule id | ⬜ |
 | TC-M8-08-04 | Override while open | 1. Configure `merge:main` to escalate to lead with a 10-minute `notify-then-pause` 2. Trigger it, wait for the timeout 3. Answer from Attention | Notification fires; the pane pauses rather than guessing an answer; answering from Attention resumes the agent and the prompt is marked answered by the user, not the policy | ⬜ |
 | TC-M8-08-05 | Webhook channel | 1. Export `ORCH_WEBHOOK_SECRET`, configure a webhook channel to a local listener 2. Send test 3. Complete a mission | The listener receives an HMAC-signed JSON payload with a deep link; signature verifies with the env secret; the settings file contains only `secretRef`; deliveries are listed with status | ⬜ |
@@ -272,11 +275,18 @@ task finishes ─▶ RevertInstructions (before M3-03 diff) ─▶ restore backu
 | TC-M8-08-07 | Negative: conflicting layers and invalid YAML | 1. Put an `autoAnswer.rules` list in `org.yaml` and a `rules!append` in `user.yaml` 2. Then break the YAML in `user.yaml` | Append semantics apply with org rules first (M8-01), visible in the numbered list with scope chips; after the break, the previous rule set stays in effect, the banner names file and line, and no prompt is auto-answered by a half-parsed rule | ⬜ |
 | TC-M8-08-08 | Negative: oversized instructions | 1. Add fragments totalling > 8 KiB for one provider 2. Open the preview and start a task | Preview shows the truncation warning listing dropped fragment ids; the written block matches the preview exactly and ends with the same note; no silent loss | ⬜ |
 | TC-M8-08-09 | Update channel | 1. Set `updates.catalog: beta` 2. Read the consequence text and History | The consequence is stated before saving; an `audit_log` row records the change; M6-03/M6-05 read the new channel on their next run (no mechanism change in this step) | ⬜ |
-| TC-M8-08-10 | Reload / resilience | 1. With rules and fragments configured, `kill -9` the daemon mid-task 2. Restart 3. Trigger a read-only prompt and finish the task | Rules and fragments identical after the restart; the worktree's managed block is still present and still excluded from git; the auto-answer works; revert on completion still produces a clean diff | ⬜ |
+| TC-M8-08-10 | Reload / resilience | 1. With rules and fragments configured, `kill -9` the daemon mid-task 2. Restart 3. Trigger a read-only prompt and finish the task | Rules and fragments identical after the restart; the persisted composition record matches the worktree; exclusions are not treated as protection; the auto-answer works; revert on completion still produces a clean diff | ⬜ |
+
+### 6.3 Review regression scenarios
+- [ ] Tracked AGENTS.md edited during task: preserve new user text.
+- [ ] Force-add and commit block, remove it in later commit: history scan still blocks submission.
+- [ ] Modified marker or overlap: preserve files and report conflict.
+- [ ] Human gate matched by auto-answer rule: refuse automatic approval.
 
 ## 7. Acceptance criteria (Definition of Done)
+- [ ] The review reconciliation contract and all §6.3 regression scenarios pass; archive evidence alongside the original test cases.
 - [ ] Composed instruction files are written into every new worktree at the manifest-declared path, with a hashed managed block that preserves any pre-existing user content (IT-M8-08-01/02, TC-M8-08-01).
-- [ ] Composed instructions never appear in a `TaskResult` diff or a commit, and are reverted exactly before result collection (IT-M8-08-03, TC-M8-08-02) — milestone exit criterion 8.
+- [ ] Results are ineligible when managed instructions appear in any submitted commit, and cleanup preserves legitimate edits before collection (IT-M8-08-03, TC-M8-08-02) — milestone exit criterion 8.
 - [ ] Over-budget composition drops fragments explicitly and names them, in the preview and in the written file (UT-M8-08-02, TC-M8-08-08).
 - [ ] Auto-answer rules are ordered and first-match-wins with an implicit `ask` default (no unmatched prompt is ever auto-answered), and a high-risk prompt can never be auto-approved — rejected at save time, downgraded to escalate at evaluation (UT-M8-08-04/05, TC-M8-08-06).
 - [ ] Every auto-decision writes `prompt.auto_answered` with the rule id **and** an `audit_log` row with `actor.kind = 'policy'` (AT-M8-08-01, TC-M8-08-03) — milestone exit criterion 9.
@@ -287,7 +297,7 @@ task finishes ─▶ RevertInstructions (before M3-03 diff) ─▶ restore backu
 - [ ] All TC-M8-08-* pass; no new ESLint / dependency-cruiser violations; `PROGRESS.md` updated.
 
 ## 8. Risks / open questions
-- **Writing into the user's repo is the riskiest mechanic in M8.** A failed revert leaves a managed block in a branch that becomes a PR. Mitigations: `.git/info/exclude`, exact byte backups, revert *before* the diff is computed, a warning on the `TaskResult` when revert fails, and IT-M8-08-03 as the gate. Consider, during implementation, whether any provider supports a *local* (gitignored) instruction file variant — if one does, prefer it for that provider and record the decision *(verify against that provider's docs at step start)*.
+- **Composition safety:** prefer session-local provider mechanisms. Ignore rules cannot protect tracked files or forced adds. Check every submitted commit, not only the final diff, and block contaminated histories until explicitly repaired; never rewrite history or discard legitimate edits automatically.
 - **Instruction filenames and semantics are vendor facts.** `CLAUDE.md` and `AGENTS.md` are the shapes we know; everything comes from `manifest.paths.instructionFile` and must be *(verified against each provider's docs at step start)*. A provider whose manifest omits it gets no instruction file and relies on skills (M8-04) instead — and a provider with neither is a Doctor finding, not a silent no-op.
 - **Auto-answer is where a misconfiguration becomes a destroyed repo.** The high-risk floor is the backstop, but `PromptClassifier`'s risk assessment (M1-11) is heuristic — a destructive command it misclassifies as low risk could be auto-approved by a broad rule. Mitigations: default rules match narrowly (explicit tool names, anchored command regexes, `pathScope: inside-worktree`), the simulator exists so rules are tested against real fixtures before they run, and every decision is auditable after the fact. Widening the shipped defaults requires evidence from the simulator.
 - **Escalation has no one to escalate to until M9-01.** `to: 'admin' | 'lead'` currently raises priority and tags; in single-user mode both land on the same person. Documented in the editor so the setting is not mistaken for a permission boundary.

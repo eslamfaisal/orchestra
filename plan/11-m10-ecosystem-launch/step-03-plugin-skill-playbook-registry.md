@@ -51,11 +51,11 @@ After this step Orchestra has one artifact registry for everything the intellige
 |---|---|---|
 | Signed index entry + sha256 match + npm provenance + publisher key ∈ `TRUSTED_KEYS` with `role: 'artifact'` and `scope: 'official'` | `official` | installs silently if `plugins.minTrust ≤ official` |
 | Signed index entry + sha256 match + npm provenance + third-party publisher listed in the signed index as `reviewed: true` | `verified` | installs with a one-line notice |
-| Signed index entry + sha256 match + npm provenance, `reviewed: false` | `community` | requires `plugins.allowCommunity` (default `true`) and shows an unreviewed-code warning |
+| Signed index entry + sha256 match + npm provenance, `reviewed: false` | `community` | quarantine only; cannot import, run contract tests, or load in v1 |
 | No index entry, or GitHub/file source, or missing provenance | `local` | refused unless the user passes `--trust local` **and** types the artifact name to confirm |
 
 - **Rule T1** — trust is decided *before* any code is read, from metadata only; the loader never "upgrades" trust after inspecting code.
-- **Rule T2** — `plugins.minTrust` (settings, default `community`) is a hard floor. An org layer may raise it; a user layer may not lower an org floor (settings-engine precedence, M8-01).
+- **Rule T2** — `plugins.minTrust` (settings, default `verified`) is a hard floor. An org layer may raise it; a user layer may not lower an org floor (settings-engine precedence, M8-01).
 - **Rule C-1 engine compat** — install requires `satisfies(daemonVersion, artifact.engines.orchestra)` **and** `satisfies(sdkVersion, artifact.sdkRange)`. A mismatch is `EngineIncompatible` naming both sides; never a warning.
 - **Rule C-2 resolution** — highest non-yanked version satisfying the requested range, the engine range and the SDK range, excluding prereleases unless `plugins.allowPrerelease`. Unknown/no candidate ⇒ `NoSatisfyingVersion` with the list of rejected candidates and why.
 - **Rule C-3 one provider id per installed plugin.** Two plugins claiming `providerId: 'kimi'` ⇒ `ProviderIdConflict`; the bundled first-party plugin always wins and the third-party one is refused (a third party extending an existing provider must use a distinct id).
@@ -136,7 +136,7 @@ Use cases (`apps/daemon/src/application/registry/`): `RefreshArtifactIndex`, `In
 ### 4.3 Data / schema changes
 - New table `installed_artifacts`: `name TEXT PK, kind TEXT, id TEXT, version TEXT, trust TEXT, source_json TEXT, sha512 TEXT, tree_sha256 TEXT, engines_orchestra TEXT, sdk_range TEXT, provider_id TEXT NULL, installed_at TEXT, installed_by TEXT, enabled INTEGER NOT NULL DEFAULT 1`. Migration `NNN-m10-03-installed-artifacts`; Postgres-compatible types only.
 - Events: `plugin.index_refreshed`, `plugin.install_started`, `plugin.installed` `{name, version, trust, sha512}`, `plugin.install_refused` `{name, code}`, `plugin.loaded`, `plugin.unloaded`, `plugin.removed`, `plugin.quarantined`. Every install/remove also writes an `audit.*` row with the actor and the trust level.
-- Config `plugins` (Zod, fail-fast): `{ enabled: true, minTrust: 'community', allowCommunity: true, allowPrerelease: false, autoUpdate: false, npmRegistry: 'https://registry.npmjs.org', maxTarballBytes: 20_971_520, installTimeoutMs: 120_000 }`. Changing `npmRegistry` is an audited settings mutation and must be `https:`.
+- Config `plugins` (Zod, fail-fast): `{ enabled: true, minTrust: 'verified', allowCommunity: false, allowPrerelease: false, autoUpdate: false, npmRegistry: 'https://registry.npmjs.org', maxTarballBytes: 20_971_520, installTimeoutMs: 120_000 }`. Changing `npmRegistry` is an audited settings mutation and must be `https:`.
 - Store layout (dir 0700, files 0600):
 ```
 ~/.orchestra/plugins/
@@ -151,7 +151,7 @@ Use cases (`apps/daemon/src/application/registry/`): `RefreshArtifactIndex`, `In
 - **Egress.** Two new `EgressReason`s: `artifact-registry` (the index host, same single host as M6-03) and `artifact-tarball` (the configured npm registry host; `codeload.github.com` + `api.github.com` only when the user explicitly used `--from github:`). Everything goes through M6-03's hardened undici client: timeouts, size cap (`maxTarballBytes`), no cookies, no auth headers, max 2 same-host redirects. `no-vendor-endpoints` still forbids everything else.
 - **Fetch.** npm: `GET {npmRegistry}/{name}` for the packument, then the version's `dist.tarball` (must be on the same host) with `dist.integrity` (sha512) checked *and* compared against the index's `sha512`. Provenance: fetch the attestation bundle and verify the Sigstore signature and that the source repo equals `manifest.repository`; if verification tooling is unavailable, provenance counts as absent (trust degrades, install does not silently continue).
 - **No install scripts, ever.** The tarball is extracted by our own code (`tar` with path traversal, symlink, absolute-path and device-file rejection); `npm`/`pnpm` are never invoked for plugin installs, so `preinstall`/`postinstall` cannot run. Dependencies: a provider plugin must be self-contained (bundled) apart from `@orchestra/sdk`, which the daemon injects; a plugin with runtime `dependencies` other than peer `@orchestra/sdk` is refused (`UnbundledDependencies`).
-- **Static checks before load** (fast, advisory-strength, not a sandbox): the entry file is scanned for `child_process`, `node:vm`, `fs` writes outside a worktree helper, `fetch`/`undici`/`http`, and dynamic `import()` of non-relative paths. Hits are **shown to the user** at install time and recorded in the audit row; for `official`/`verified` they block the install (maintainer bug), for `community`/`local` they require confirmation. These are detection aids — ADR-014 is explicit that they are not a security boundary.
+- **Static checks before load** (fast, advisory-strength, not a sandbox): the entry file is scanned for `child_process`, `node:vm`, `fs` writes outside a worktree helper, `fetch`/`undici`/`http`, and dynamic `import()` of non-relative paths. Hits are **shown to the user** at install time and recorded in the audit row; for `official`/`verified` they block the install (maintainer bug), community remains quarantined; local execution requires explicit administrator trust for that exact artifact hash. These are detection aids — ADR-014 is explicit that they are not a security boundary.
 - **Load.** `import(pathToFileURL(dir/entry))` inside the plugin host; the module must default-export or named-export `{ adapter, manifest }`; the adapter is validated against the SDK shape (all required interface members present, `id` matching `provides.providerId`) and then run through a **contract smoke**: `manifest.contract.spec` plus `auth`, `launcher` and `telemetry` specs against the plugin's own `fixturesDir`. Failure ⇒ `ContractSmokeFailed`, nothing registered, directory quarantined.
 - **Hot registration.** On success the adapter is added to the DI provider map atomically; Fleet (M1-10) picks it up over WS; Doctor schedules its checks; the manifest registry (M6-03) begins tracking its `cliVersionRange`. Unload is the reverse and is refused while sessions exist (Rule C-4).
 - **Data artifacts** (skills/playbooks/policies/catalog) are validated against their existing Zod schemas (M8-04, M3-01, M2-01, M2-02) before being merged into the catalog layers as a new lowest-precedence-but-above-defaults layer; invalid files are refused as a whole package, never partially.
@@ -187,8 +187,11 @@ orch plugin install orchestra-provider-kimi@^1
 remove: Rule C-4 (drain) → unloadProvider → store.remove → plugin.removed + audit
 ```
 
+### 4.7 Review reconciliation contract (2026-09-15)
+v1 runs trusted code only: official, reviewed verified, or explicitly administrator-trusted local artifacts by immutable hash, subject to org policy. Provenance establishes origin, not safety. Trust is checked before dynamic import, shape inspection requiring evaluation, bundled test execution or registration; contracts themselves are executable plugin code. Quarantined community artifacts may be inspected as inert data only and cannot self-promote. Third-party release proof uses a reviewed verified artifact or an explicitly trusted local artifact, never silently community. Untrusted plugin hosting is deferred until an isolated process boundary, resource limits, narrow RPC, credential isolation and revocation have been designed and tested.
+
 ## 5. Tasks
-- [ ] Write `plan/adr/ADR-014-plugin-sandboxing.md` (decision: no runtime sandbox in v1; signature + trust + review + no-install-scripts + declarative `declares` as compensating controls; revisit trigger: first `community` provider plugin with > 100 installs, or any reported malicious artifact). Add the `DECISIONS.md` row.
+- [ ] Write `plan/adr/ADR-014-plugin-sandboxing.md` (decision: no runtime sandbox in v1; signature + trust + review + no-install-scripts + declarative `declares` as compensating controls; revisit trigger: before any untrusted community plugin code is executed). Add the `DECISIONS.md` row.
 - [ ] `packages/sdk/src/registry/`: `ArtifactManifest` + `ArtifactIndex` Zod schemas (`additionalProperties: false`), JSON-Schema export, `ArtifactKind` union, public README section.
 - [ ] `packages/core/src/registry/compat.ts`: `resolveArtifactVersion` + `deriveTrust` (pure, 100 % branch, golden tables).
 - [ ] Provider-id conflict + `minTrust` precedence rules in the settings engine (org may raise, user may not lower).
@@ -218,7 +221,7 @@ remove: Rule C-4 (drain) → unloadProvider → store.remove → plugin.removed 
 | UT-M10-03-03 | unit | `ArtifactManifest` schema: unknown property, `declares.egressHosts: ['x']`, provider name not matching `orchestra-provider-*`, missing `engines.orchestra` | each rejected with a distinct Zod issue path |
 | UT-M10-03-04 | unit (fast-check) | tar entry names: `../`, absolute, symlink to `/etc`, device file, 3 000-char path | every one rejected; extractor never writes outside the target dir; never throws uncaught |
 | UT-M10-03-05 | unit | settings precedence: org `minTrust: 'verified'`, user `minTrust: 'local'` | effective `verified`; user lowering is rejected with a named error |
-| AT-M10-03-01 | application | `InstallArtifact` happy path from the fixture registry (provider plugin) | installed, loaded, registered; `plugin.installed` + `plugin.loaded` + audit row with trust `community` |
+| AT-M10-03-01 | application | `InstallArtifact` happy path from the fixture registry (provider plugin) | installed, loaded, registered; `plugin.installed` + `plugin.loaded` + audit row with trust `verified` |
 | AT-M10-03-02 | application | tampered tarball (sha512 differs from index) | `install_refused`, quarantine dir created, nothing loaded, provider map unchanged |
 | AT-M10-03-03 | application | plugin whose bundled fixtures fail the contract smoke | `ContractSmokeFailed` with failing spec ids; not registered; directory quarantined |
 | AT-M10-03-04 | application | second plugin claiming an existing `providerId` | `ProviderIdConflict`; first-party plugin still active |
@@ -234,7 +237,7 @@ remove: Rule C-4 (drain) → unloadProvider → store.remove → plugin.removed 
 ### 6.2 Manual test cases (run by you before marking ✅)
 | ID | Scenario | Steps | Expected result | Status |
 |---|---|---|---|---|
-| TC-M10-03-01 | Install a signed provider plugin from the registry | 1. `pnpm registry:serve`. 2. `orch plugin install orchestra-provider-demo --json`. 3. `orch plugin list`. 4. Open Fleet. | Trust `community`, sha512 + provenance shown, contract smoke green, provider row appears without a daemon restart; elapsed install < 30 s | ⬜ |
+| TC-M10-03-01 | Install a signed provider plugin from the registry | 1. `pnpm registry:serve`. 2. `orch plugin install orchestra-provider-demo --json`. 3. `orch plugin list`. 4. Open Fleet. | Trust `verified`, sha512 + provenance shown, contract smoke green, provider row appears without a daemon restart; elapsed install < 30 s | ⬜ |
 | TC-M10-03-02 | Install from a GitHub repo | 1. `orch plugin install --from github:<you>/orchestra-provider-demo#v0.1.0 --trust local`. 2. Read the confirmation dialog. | Type-to-confirm required; dialog states the code runs with daemon privileges (ADR-014); after confirming, install proceeds and is audited with trust `local` | ⬜ |
 | TC-M10-03-03 | **Negative: unsigned / not in the index** | 1. Serve a plugin that is absent from the signed index. 2. `orch plugin install orchestra-provider-rogue`. | Refused before any download completes; message names the missing index entry and the `--trust local` escape hatch; nothing under `~/.orchestra/plugins/` | ⬜ |
 | TC-M10-03-04 | **Negative: incompatible engine version** | 1. Publish `orchestra-provider-demo@2.0.0` with `engines.orchestra: ">=9"`. 2. `orch plugin install orchestra-provider-demo@2`. | `EngineIncompatible` naming required `>=9` and the daemon version; exit 2; the 1.x install stays active and loaded | ⬜ |
@@ -247,7 +250,14 @@ remove: Rule C-4 (drain) → unloadProvider → store.remove → plugin.removed 
 | TC-M10-03-11 | Author workflow | 1. Copy `examples/provider-plugin-template` to a new repo. 2. `orch plugin check .`. 3. Break the manifest and re-run. | Check reports manifest OK, contract harness green, trust that would be granted; after breaking, it names the exact field and exits 2 | ⬜ |
 | TC-M10-03-12 | Offline | 1. Install two artifacts. 2. Disable the network. 3. Restart the daemon; `orch plugin list`; `orch plugin verify <name>`. | Both load from the store; verify passes offline against recorded hashes; no error surfaced; index age shown as stale | ⬜ |
 
+### 6.3 Review regression scenarios
+- [ ] Community plugin with top-level side effect is quarantined before import.
+- [ ] Community bundled contract harness is never executed in daemon.
+- [ ] User cannot lower org trust floor or enable community through settings.
+- [ ] Update changes artifact hash: local trust must be explicitly renewed.
+
 ## 7. Acceptance criteria (Definition of Done)
+- [ ] The review reconciliation contract and all §6.3 regression scenarios pass; archive evidence alongside the original test cases.
 - [ ] A provider plugin that is not in the signed index, whose hash does not match, whose `engines.orchestra` excludes the daemon, or whose contract smoke fails is **never loaded** (TC-03, TC-04, TC-05, TC-07).
 - [ ] No plugin install ever executes package lifecycle scripts, and no plugin may declare egress hosts or non-allowlisted binaries (TC-06, IT-04).
 - [ ] `resolveArtifactVersion` and `deriveTrust` have 100 % branch coverage; the tar extractor has a fuzz test proving no write escapes the target directory.
@@ -260,13 +270,13 @@ remove: Rule C-4 (drain) → unloadProvider → store.remove → plugin.removed 
 - [ ] All TC-M10-03-01 … 12 pass and are recorded; no new lint / dependency-cruiser violations.
 
 ## 8. Risks / open questions
-- **ADR-014 is the biggest accepted risk in the product.** Plugin code runs in-process with the daemon, which owns tmux, the DB and the token. The compensating controls are metadata-level. Revisit triggers are written into the ADR; a worker-thread host with a capability-passing API is the likely post-1.0 design.
+- **ADR-014 is the biggest accepted risk in the product.** Plugin code runs in-process with the daemon, which owns tmux, the DB and the token. The compensating controls are metadata-level. Revisit triggers are written into the ADR; an isolated process with restricted credentials/filesystem/network and narrow RPC is required before untrusted execution; worker threads and node:vm are not security boundaries.
 - npm provenance verification depends on Sigstore tooling and on the attestation being published; if the toolchain is unavailable at runtime the trust level degrades rather than failing — confirm the exact verification API and offline behaviour **(verify against npm provenance / Sigstore docs at step start)**.
 - `minEngine` in the manifest index (M6-03) and `engines.orchestra` here must use one range dialect — M6-03's log already flagged this. Decision for implementation: both are npm-style semver ranges evaluated by the same helper; add a migration note if M6-03 shipped a different spelling.
 - Key custody: the artifact index and the manifest index should use **different** signing keys with different roles so a leak is contained; both are pinned in the SDK, so rotation is an SDK release (M6-03 §4.1).
 - Registry availability becomes a product dependency for third parties; the client must stay fully functional offline from the store (TC-12), and the launch checklist (M10-07) must cover hosting, backups and key custody.
 - Third-party plugins can be abandoned. The index carries `deListed` and yank flags, and Health should warn when an installed plugin's repository is archived — the archived-repo check is post-1.0.
-- Review capacity for the `verified` tier is a human bottleneck; the policy document must state the SLA honestly (best-effort at 1.0) so `community` is the expected default.
+- Review capacity for the `verified` tier is a human bottleneck; the policy document must state the SLA honestly (best-effort at 1.0) so unreviewed community artifacts remain quarantined; review delay never relaxes load policy.
 
 ## 9. Notes & progress log
 | Date | Note |

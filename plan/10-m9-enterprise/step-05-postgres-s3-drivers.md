@@ -11,7 +11,7 @@
 | Owner | |
 
 ## 1. Goal
-Setting `storage.driver: postgres` and `storage.recordings.driver: s3` in `config.yaml` makes the daemon run against Postgres 16 and an S3-compatible object store with no other change and no feature loss: the same migration list runs on both dialects, every repository contract suite passes on both, full-text search works through a `SearchPort` backed by FTS5 on SQLite and `tsvector` on Postgres, and asciicast recordings are uploaded with multipart and replayed through presigned URLs. `orch storage migrate --from sqlite --to postgres --recordings fs:s3` moves an existing single-user installation across with equal row counts per table and a still-verifiable audit chain. SQLite remains the default and the only requirement for solo use.
+Setting `storage.driver: postgres` and `storage.recordings.driver: s3` in `config.yaml` makes the daemon run against Postgres 16 and an S3-compatible object store with no other change and no feature loss: separate versioned migration histories implement the same logical schema on each dialect, every repository contract suite passes on both, full-text search works through a `SearchPort` backed by FTS5 on SQLite and `tsvector` on Postgres, and asciicast recordings are uploaded with multipart and replayed through presigned URLs. `orch storage migrate --from sqlite --to postgres --recordings fs:s3` moves an existing single-user installation across with equal row counts per table and a still-verifiable audit chain. SQLite remains the default and the only requirement for solo use.
 
 ## 2. Why
 - D8 states enterprise is "**a driver swap**". This step is where that claim is either proven or exposed; the README's exit criterion 4 (Postgres parity) is the proof.
@@ -24,7 +24,7 @@ Setting `storage.driver: postgres` and `storage.recordings.driver: s3` in `confi
 ## 3. Scope
 ### In scope
 - `PostgresDialect` wiring for Kysely (`pg` pool), `storage.driver: sqlite | postgres` config switch, DI-selected `DatabaseProvider` (strategy, no `switch` outside the factory).
-- One migration list for both dialects with a small `DialectHelpers` abstraction (json column type, upsert, partial index, trigger DDL, generated columns).
+- Dialect-specific migration histories with explicit logical-schema mapping; shared helpers only where SQL semantics match.
 - Migration **parity** test: every migration runs on both engines under Testcontainers, and the resulting schema is compared structurally.
 - Repository/port contract suites (M0-05's shared spec factories) executed against Postgres, in addition to SQLite and in-memory.
 - `SearchPort` Postgres implementation: `tsvector` columns + GIN indexes + `websearch_to_tsquery`, with the same `SearchQuery`/`SearchHit` contract and the same query-builder rules as M5-03.
@@ -93,7 +93,7 @@ export interface MigrateReport { tables: Array<{ table: string; source: number; 
 ```
 
 ### 4.3 Data / schema changes
-- No new domain tables. Migration `0094_dialect_parity` reworks the **helpers**, not the shape: existing migrations `0001`…`0093` are rewritten to call `DialectHelpers` instead of raw SQL where they are dialect-specific. Because M0-04's rule is "never edit shipped migrations", this is done as a **one-time baseline re-emit** guarded by an ADR (`ADR-016-dialect-parity-baseline`): SQLite installations keep their applied-migration list (a compatibility shim maps old ids to new ones), and a `pg` installation starts from the re-emitted baseline. This is the single riskiest decision in the step and needs the ADR written before any code (verify the shim approach against the M0-04 runner's bookkeeping table).
+- Preserve all shipped SQLite migrations and checksums. Add a separately versioned Postgres baseline with explicit mapping to the current logical schema, followed by append-only Postgres migrations. New logical schema changes provide migrations for each supported dialect. No baseline re-emit or applied-ID shim rewrites SQLite history.
 - Postgres specifics introduced:
   - JSON columns become `jsonb` (Kysely maps to the same TS types); the `json_valid()` CHECK is replaced by the type itself.
   - `0092_audit_chain`'s SQLite triggers get their Postgres twin: a `BEFORE UPDATE OR DELETE` trigger function reading `current_setting('orchestra.audit_maintenance', true)` plus `REVOKE UPDATE, DELETE ON audit_log FROM orchestra_app`. The migration runs as the owner role; the daemon connects as `orchestra_app`.
@@ -158,8 +158,11 @@ session recording lifecycle with s3
                                    → CLI/proxy ⇒ stream getRange
 ```
 
+### 4.7 Review reconciliation contract (2026-09-15)
+Repository contracts run on both clean databases and upgrades from the previous supported version. Migration transfer compares counts plus stable row/content hashes and verifies audit chains. Search contracts cover filtering, required relevant hits, pagination and documented tokenization; ranking may differ and scores are not cross-engine comparable. Test duplicate ingestion and concurrent claims under both transaction models. A driver configuration switch alone never constitutes a successful migration.
+
 ## 5. Tasks
-- [ ] Write `ADR-016-dialect-parity-baseline` (how migrations become dialect-aware without editing shipped ones; the id-mapping shim; rollback story). Get it merged before code.
+- [ ] Write ADR-016 with separate dialect histories, logical version mapping, backup/restore and migration rollback boundaries; reconcile DECISIONS before implementation.
 - [ ] `DialectHelpers` interface + `SqliteDialectHelpers` + `PostgresDialectHelpers`; refactor migrations `0001`…`0093` to use them; keep the SQLite-applied-list shim.
 - [ ] `DatabaseProvider` strategy (`SqliteDatabaseProvider`, `PostgresDatabaseProvider`) with pool config, `withTx`, `health`, graceful `close`; DI registration keyed by `storage.driver`.
 - [ ] Migration parity test harness: run the full list on SQLite and on Postgres (Testcontainers), then compare normalised schemas (tables, columns, nullability, indices, triggers) and assert the documented deltas only.
@@ -203,7 +206,15 @@ session recording lifecycle with s3
 | TC-M9-05-07 | Backup and restore drill | 1. `pg_dump -Fc` the database and note the bucket contents. 2. Drop the database and the bucket prefix. 3. Restore the dump, re-point the bucket. 4. `orch storage check` and `orch audit verify`; open a replay. | Restore completes with no manual schema fixes; storage check reports the same schema version; the audit chain verifies; the replay plays. Write the wall-clock time of the drill in the step log. | ⬜ |
 | TC-M9-05-08 | SQLite is untouched | 1. Set `storage.driver: sqlite`, `recordings.driver: fs`. 2. Run the full M0–M8 E2E suite and the M5 replay demo. | Everything behaves as before the step; no Docker required; `orch storage check` reports `sqlite` with zero pending migrations. | ⬜ |
 
+### 6.3 Review regression scenarios
+- [ ] Shipped SQLite migration hashes remain unchanged.
+- [ ] Upgrade and clean install converge to matching logical schema.
+- [ ] Concurrent event ingestion and claims preserve uniqueness on both stores.
+- [ ] Search relevant-hit coverage passes without identical rank ordering.
+- [ ] Backup restoration verifies content hashes and audit integrity.
+
 ## 7. Acceptance criteria (Definition of Done)
+- [ ] The review reconciliation contract and all §6.3 regression scenarios pass; archive evidence alongside the original test cases.
 - [ ] `ADR-016-dialect-parity-baseline` merged and linked from `DECISIONS.md` before implementation.
 - [ ] The same migration list runs on SQLite and Postgres; the parity test's schema diff shows only the documented deltas.
 - [ ] Every repository and port contract spec passes on SQLite, in-memory **and** Postgres in CI (IT-M9-05-02).
@@ -216,7 +227,7 @@ session recording lifecycle with s3
 - [ ] All TC-M9-05-* pass and are recorded; no new lint/arch violations; `docs/deployment/storage.md` written; `PROGRESS.md` updated.
 
 ## 8. Risks / open questions
-- **The baseline re-emit is the biggest risk in M9.** Rewriting shipped migrations to be dialect-aware contradicts M0-04's "never edit shipped migrations" rule; the ADR must justify it and the shim must be tested against a real M8-era database, or the alternative (a separate Postgres-only migration list that is manually kept in sync) must be chosen instead. The parity test makes the second option survivable but doubles maintenance (verify with a spike before committing).
+- **Dialect drift:** verify schema, uniqueness, JSON semantics, generated columns, FTS, transaction isolation and concurrent repository behavior on clean and upgraded databases. Separate histories increase maintenance but preserve deployed migration integrity.
 - Search parity is *approximate*, not exact: FTS5 `bm25` and Postgres `ts_rank_cd` produce different scores, and `simple` vs `unicode61` tokenise identifiers slightly differently (underscores, dots). The contract spec must assert set equality and top-10 order, not exact ranks, and the deltas must be documented.
 - Arabic search on Postgres with the `simple` configuration does no stemming; SQLite's `remove_diacritics 2` does normalise. This may make Arabic recall differ visibly (verify with TC-M9-05-02 and, if it matters, evaluate `unaccent` + a custom configuration).
 - ISO-8601 `text` timestamps on Postgres (chosen for wire compatibility) forgo `timestamptz` indexing benefits and sorting correctness for mixed offsets. All writes are UTC ISO-8601 by convention (`04-domain-model.md`), so lexicographic order is correct — but this should be stated explicitly in the docs and asserted by a test (verify).

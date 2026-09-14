@@ -178,6 +178,9 @@ orch settings explain routing.taskTypes.boilerplate.primary
   ─▶ GET /api/settings/provenance ─▶ value · layer user · ~/.orchestra/user.yaml:7 · shadowed: workspace.yaml:12, defaults
 ```
 
+### 4.7 Review reconciliation contract (2026-09-15)
+Preference precedence remains task > user > workspace > org > defaults. Mandatory constraints use a separate restrictive merge: higher-trust org/workspace deny rules, human gates, plugin trust floors and budget caps cannot be weakened by a lower-trust layer. Return both effective value and governing policy provenance; reject conflicting overrides instead of silently allowing them.
+
 ## 5. Tasks
 - [ ] `SettingsSection` / `SettingsSectionRegistry` types in `packages/sdk`; registry implementation with composed strict root schema + JSON Schema export.
 - [ ] `SettingsResolver.resolve()` — directive resolution, deep merge, list semantics, deny-wins, sealing; pure, no I/O.
@@ -226,7 +229,12 @@ orch settings explain routing.taskTypes.boilerplate.primary
 | TC-M8-01-07 | Reload / resilience | 1. With valid layers, `kill -9` the daemon 2. Restart 3. `orch settings explain routing.epsilon` 4. Edit `workspace.yaml` while the daemon is down, then restart again | Same effective value and version hash after the first restart; after the second, the edit is picked up on boot with correct provenance; watchers re-established (a further live edit reloads within 1 s) | ⬜ |
 | TC-M8-01-08 | Diff view | 1. Settings → Diff, choose `workspace` vs `effective` | Every key the user layer overrides appears as *shadowed*; every key only the workspace sets appears unchanged; counts match `orch settings diff` output | ⬜ |
 
+### 6.3 Review regression scenarios
+- [ ] Task override cannot disable a human gate or lower org plugin trust.
+- [ ] Ordinary UI preferences still follow declared precedence.
+
 ## 7. Acceptance criteria (Definition of Done)
+- [ ] The review reconciliation contract and all §6.3 regression scenarios pass; archive evidence alongside the original test cases.
 - [ ] Five layers resolve in the order task > user > workspace > org > defaults, with the documented merge algebra and 100 % branch coverage on `packages/core/src/settings/**`.
 - [ ] Every effective leaf has provenance (layer, file, line) visible in the UI and from `orch settings explain`, including shadowed values (TC-M8-01-02).
 - [ ] An invalid layer never replaces the last-known-good tree, never fails a preview and never disturbs a running session (IT-M8-01-02, TC-M8-01-04).

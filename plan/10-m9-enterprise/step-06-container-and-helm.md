@@ -44,7 +44,7 @@ Orchestra ships as one OCI image and one Helm chart. `docker build -f deploy/doc
 ### 4.1 Domain (entities, value objects, rules)
 No new domain types. Two operational rules are introduced and must be documented in the chart's NOTES.txt:
 - **R-C1 Sessions do not outlive the pod.** In container mode the tmux server runs inside the daemon's container, so a pod restart kills every agent. On restart the supervisor reconciles (M1-02) and marks previously running sessions `crashed` with `reason: 'host_restarted'`; open prompts are preserved (M5-05) and shown with a "restored" badge. `features.container: true` makes the UI say this plainly in the Fleet screen instead of showing an unexplained crash.
-- **R-C2 Worktrees are pod-local.** `git worktree` needs a real filesystem, so worktrees live on the PVC. Uncommitted work in a worktree survives a pod restart only if the PVC is `ReadWriteOnce` and re-attached to the same node; it is lost if the volume is recreated. The chart therefore defaults to a PVC and refuses `emptyDir` unless `values.persistence.acceptDataLoss: true`.
+- **R-C2 Worktrees are pod-local.** `git worktree` needs a real filesystem, so worktrees live on the PVC. Uncommitted work survives only according to the storage class, backing volume, topology and reclaim/lifecycle policy. ReadWriteOnce constrains mount access; it does not imply same-node persistence. Document and test rescheduling for the selected storage class, and distinguish volume loss from process loss. The chart therefore defaults to a PVC and refuses `emptyDir` unless `values.persistence.acceptDataLoss: true`.
 
 ### 4.2 Interfaces / contracts
 ```ts
@@ -192,6 +192,9 @@ kubectl delete pod
       Fleet shows "restored" badge; Attention still holds every prompt that was open
 ```
 
+### 4.7 Review reconciliation contract (2026-09-15)
+Pod replacement terminates its agent processes even when worktree data persists. Old prompts remain historical records with cancelled/session-gone or delivery-uncertain outcomes; they are not advertised as answerable. Use one active supervisor per namespace and fencing during rescheduling. Document local-PV node affinity versus network-backed storage and run restoration tests with explicit PVC lifecycle settings.
+
 ## 5. Tasks
 - [ ] `deploy/docker/Dockerfile` (multi-stage, non-root, tini, tmux/git/ssh) + `.dockerignore`; build for amd64 and arm64 with buildx.
 - [ ] `tools/scripts/assert-no-vendor-binaries.sh` + a CI step that fails the build if a vendor CLI is present in the image.
@@ -236,7 +239,13 @@ kubectl delete pod
 | TC-M9-06-07 | Real CLI in the container | 1. Build a derived image with Claude Code installed per vendor docs. 2. Deploy it; `kubectl exec` and complete the official `claude` login once with the CLI config dir on `/data`. 3. Start a real session and answer a prompt from the browser. | Login persists across a pod restart (config on the PVC); the session runs in a tmux pane in the pod; prompts round-trip; nothing about the login was automated or proxied by Orchestra. | ⬜ |
 | TC-M9-06-08 | Resource limits and read-only FS | 1. Set `resources.limits.memory: 1Gi`. 2. Run 10 FakeProvider sessions. 3. `kubectl top pod` and check for OOMKills; try `touch /etc/foo` inside the container. | No OOMKill at the documented session count (or the docs' sizing table is corrected from this measurement); writing outside `/data` and `/tmp` fails; the daemon logs no permission errors during normal operation. | ⬜ |
 
+### 6.3 Review regression scenarios
+- [ ] Pod restart preserves worktree bytes on the configured PVC but cancels old process-bound approvals.
+- [ ] Node reschedule follows the selected storage topology; unsupported relocation is reported.
+- [ ] Volume deletion is handled as data loss/backup recovery, never prompt restoration.
+
 ## 7. Acceptance criteria (Definition of Done)
+- [ ] The review reconciliation contract and all §6.3 regression scenarios pass; archive evidence alongside the original test cases.
 - [ ] One multi-arch image builds reproducibly, runs as a non-root user with a read-only root filesystem, and contains `tmux` + `git` but **no vendor CLI** (CI-asserted).
 - [ ] Image is signed (cosign) and ships an SBOM, consistent with the supply-chain controls in `07-compliance-rules.md`.
 - [ ] `helm install` on kind reaches `Ready` within 120 s against Postgres + MinIO + Dex, with startup/liveness/readiness probes behaving per the table (liveness does not depend on the DB).

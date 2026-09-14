@@ -11,7 +11,7 @@
 | Owner | |
 
 ## 1. Goal
-After this step Orchestra learns from its own work. Every finished task — mission task (M3-03/M3-04), Quick Delegate, or skill eval (M8-05) — writes an `Outcome` row; a pure `OutcomeAggregator` rolls those into per-`(model, taskType)` evidence (review findings per 100 LOC, test pass rate, rework rounds, latency p50/p90, estimated cost, sample size, recency); a pure `LocalProfileAdjuster` turns that evidence into **bounded, decaying adjustments of local model-profile dimension weights — hard-capped at ±0.2, never below `minSamples`, never touching constraints, ToS or auth rules**. The Models › Scorecard screen shows local evidence side by side with the community baseline, lists every adjustment with the evidence that produced it, and offers a reset. `orch outcomes export --anonymised` produces an opt-in bundle with no repo names, goals, paths or identifiers.
+After this step Orchestra learns from its own work. Every finished task — mission task (M3-03/M3-04), Quick Delegate, or skill eval (M8-05) — writes an `Outcome` row; a pure `OutcomeAggregator` rolls those into per-`(model, taskType)` evidence (review findings per 100 LOC, test pass rate, rework rounds, latency p50/p90, estimated cost, sample size, recency); a pure `LocalProfileAdjuster` turns that evidence into **shadow-only proposals for bounded, decaying adjustments of local model-profile dimension weights — hard-capped at ±0.2, never below `minSamples`, never touching constraints, ToS or auth rules**. The Models › Scorecard screen shows local evidence side by side with the community baseline, lists every adjustment with the evidence that produced it, and offers a reset. `orch outcomes export --anonymised` produces an opt-in bundle with no repo names, goals, paths or identifiers.
 
 ## 2. Why
 - **D7 / `06-intelligence-layer.md §3`** — the learning loop is written into the intelligence layer's definition: outcomes adjust *local* profile weights and surface as a Model Scorecard. Until now the `outcomes` table has had writers planned but no consumer.
@@ -27,7 +27,7 @@ After this step Orchestra learns from its own work. Every finished task — miss
 - Pure `OutcomeAggregator`: windowed, recency-decayed aggregation per `(model, taskType)` and per `(model, taskType, skill)`.
 - Pure `LocalProfileAdjuster`: evidence → dimension deltas, hard-capped at ±0.2 per dimension, gated by `minSamples` (default 5), decayed by a half-life (default 30 d), monotone and deterministic.
 - `model_profiles` local rows (`source: 'local'`) carrying `adjustments_json`, `base_profile_id`, `computed_at`, consumed by the existing `ModelCatalogPort` so the assignment engine needs no change.
-- A new reason code `local-evidence` on routing decisions when an adjustment moved the ranking.
+- A new reason code `local-evidence` on routing decisions only after an explicitly approved policy version applies a proposal.
 - `learning` settings section (M8-01): `enabled`, `minSamples`, `maxDelta`, `halfLifeDays`, `sources` (which of mission/quick/eval count), `perSkill`.
 - Models › Scorecard screen: `(model, taskType)` grid, cell detail with evidence vs community baseline, adjustment history, reset (per model / per cell / all).
 - `orch outcomes list|show|export`, `orch models scorecard`, `orch models reset-adjustments`.
@@ -179,13 +179,16 @@ task finishes (M3-03 result / M3-04 review verdict / M8-05 eval score)
               └─ ModelCatalogPort hot reload ─▶ learning.profiles_recomputed ─▶ WS 'learning'
 
 next routing decision ─▶ AssignmentEngine reads the adjusted dimensions (no engine change)
-   ─▶ if an adjustment changed the ranking, reasons include `local-evidence`
+   ─▶ if an approved policy version changed the ranking, reasons include `local-evidence`
    ─▶ "why this model" chip ─▶ deep link ─▶ Scorecard cell ─▶ the outcome rows behind it
 
 reset ─▶ ResetLocalAdjustments ─▶ delete local rows in scope ─▶ audit ─▶ recompute ─▶ community profile in effect
 export ─▶ telemetry.anonymisedExport gate ─▶ allowlisted field projection ─▶ preview sample ─▶ confirm
         ─▶ outcomes-<hostHash>-<range>.jsonl + manifest.json ─▶ learning.export_created + audit
 ```
+
+### 4.7 Review reconciliation contract (2026-09-15)
+Default learning mode is shadow: compute proposals and scorecards while routing uses the current approved policy. `minSamples` is a display/eligibility threshold, not proof of causal superiority. Segment by task type, difficulty, provider version, evaluation source and missing outcomes; show uncertainty and selection bias. Applying a proposal requires a recorded evaluation report on representative held-out tasks, a human-approved versioned policy change, rollback criteria and subsequent observation. No automatic routing-weight write is allowed in v1; reset/history/export remain available.
 
 ## 5. Tasks
 - [ ] `Outcome` / `Evidence` / `ProfileAdjustment` VOs + `LearningSettings`; register the `learning` settings section against M8-01.
@@ -237,7 +240,14 @@ export ─▶ telemetry.anonymisedExport gate ─▶ allowlisted field projectio
 | TC-M8-06-08 | Negative: learning disabled / conflicting layers | 1. Set `learning.enabled: false` in `user.yaml` while `org.yaml` sets `true` 2. Recompute 3. Set `maxDelta: 0.5` in `user.yaml` | User layer wins (M8-01 precedence) and no adjustments apply, with the reason shown; `maxDelta: 0.5` is clamped to 0.2 with a visible warning naming the file and line | ⬜ |
 | TC-M8-06-09 | Reload / resilience | 1. Kill the daemon mid-recompute (`kill -9`) 2. Restart 3. Open the Scorecard and preview a task | No partially written local profile: either the previous adjustment or a freshly recomputed one, never a mixture; history has no torn entry; the preview works throughout | ⬜ |
 
+### 6.3 Review regression scenarios
+- [ ] Five favorable observational samples create a proposal but do not change routing.
+- [ ] Held-out evaluation and approval bind the exact proposal/policy version.
+- [ ] Mixed eval/production cohorts are visible and do not imply causal superiority.
+- [ ] Rollback restores the prior policy without deleting outcome history.
+
 ## 7. Acceptance criteria (Definition of Done)
+- [ ] The review reconciliation contract and all §6.3 regression scenarios pass; archive evidence alongside the original test cases.
 - [ ] Every finished mission task, Quick Delegate and skill eval writes exactly one idempotent `Outcome` row (AT-M8-06-01, IT-M8-06-01).
 - [ ] Adjustments are bounded to ±0.2, gated by `minSamples`, recency-decayed and *derived* — removing evidence removes the adjustment (UT-M8-06-03/05, TC-M8-06-02).
 - [ ] The loop can only move profile dimensions; constraints, allowlists, cost tiers, ToS and auth are unreachable by construction (UT-M8-06-06).

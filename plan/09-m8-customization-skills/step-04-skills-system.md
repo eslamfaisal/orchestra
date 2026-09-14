@@ -193,6 +193,9 @@ Lead session ─▶ MCP capabilities() ─▶ { …, skills: [{id, version, task
 task done ─▶ RemoveWorktree ─▶ mark skill_installs.removed_at ─▶ skill.uninstalled
 ```
 
+### 4.7 Review reconciliation contract (2026-09-15)
+Instruction packages retain the non-executable file allowlist. Evaluation code and fixture repositories belong to a separate trusted EvaluationEnvironment artifact pinned by repository revision/content hash, runner image/toolchain and declared commands. Skill metadata references this environment; installation never runs it. Dataset paths in a skill are inert allowed data, not executable setup scripts.
+
 ## 5. Tasks
 - [ ] `SkillFrontmatter` / `Skill` types + Zod schema + `evals` sub-schema in `packages/sdk/src/skill.ts`; extend `SkillsInstaller` with `plan()` and `uninstall()`.
 - [ ] Checksum function (canonical file listing → SHA-256) + file-type allowlist, symlink/traversal/executable rejection, size and count caps, secret scan.
@@ -246,7 +249,12 @@ task done ─▶ RemoveWorktree ─▶ mark skill_installs.removed_at ─▶ ski
 | TC-M8-04-09 | Reload / resilience | 1. With skills installed in an active worktree, `kill -9` the daemon 2. Restart 3. Open Skills and the task drawer | Library and install matrix identical after restart; installs reconciled (no phantom rows); adding a skill directory from a terminal appears within 1 s | ⬜ |
 | TC-M8-04-10 | Scope shadowing | 1. Put a modified `adr-writing` in `<repo>/.orchestra/skills/` 2. Put another in `~/.orchestra/skills/` 3. Resolve for an `adr-writing` task | User scope wins with reason `higher-scope`; the workspace copy is listed as shadowed in the library; only one is installed | ⬜ |
 
+### 6.3 Review regression scenarios
+- [ ] Executable fixture hidden inside a skill is rejected.
+- [ ] Valid environment reference installs without executing any code.
+
 ## 7. Acceptance criteria (Definition of Done)
+- [ ] The review reconciliation contract and all §6.3 regression scenarios pass; archive evidence alongside the original test cases.
 - [ ] A skill validates, checksums, imports as `untrusted`, and cannot be installed until reviewed; every trust change and install is audited (TC-M8-04-05, AT-M8-04-01/02).
 - [ ] Unsafe artifacts (symlink, executable, traversal, oversize, secret-bearing) are rejected at any trust level and never write a file (UT-M8-04-05, TC-M8-04-06).
 - [ ] Installation targets come exclusively from `manifest.paths.skillsDir`; a provider without one is excluded with a reason, never guessed (UT-M8-04-03, TC-M8-04-04).
